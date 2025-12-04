@@ -132,6 +132,10 @@ dmypy.json
 */in_data*
 */out_data*
 0_original_codes/
+data/
+
+# Mac OS
+.DS_Store
 
 # Pycharm
 .idea
