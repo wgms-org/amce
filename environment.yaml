@@ -1,0 +1,13 @@
+name: ggmc
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pandas=2.0
+  - matplotlib=3.7
+  - numpy=1.24
+  - pyproj=3.5
+  - scipy=1.10
+  - pykrige=1.7.2
+  - pytest
