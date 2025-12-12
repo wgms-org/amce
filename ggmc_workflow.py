@@ -402,7 +402,7 @@ FOG_VERSION = '2025-01'
 # Paths
 GRID_PATH = "./data/input/Creation_workflow/Tiles_by_region_0.5"
 MASS_BALANCE_MWE_PATH = "./data/input/Creation_workflow/MB_mwe_gridded_0.5_by_region" # path + '\\out_data_fog_'+fog_version+'\\0_Output_Regional_MB_mwe_by_gridpoint_fog_'+fog_version+'\\'
-MASS_BALANCE_SIGMA_PATH = "./data/input/Creation_workflow/MB_sigma_mwe_gridded_0.5_by_region" # path_mb + 'MB_mwe_gridded_0.5_by_region\\' # Specific mb files
+MASS_BALANCE_SIGMA_PATH = "./data/input/Creation_workflow/MB_sigma_mwe_gridded_0.5_by_region/" # path_mb + 'MB_mwe_gridded_0.5_by_region\\' # Specific mb files
 OUTPUT_DATA_PATH_STRING = "./data/output/Creation_workflow"
 
 
@@ -484,7 +484,3 @@ csv2netcdf4_globalGrid(FOG_VERSION,
                        SPECIFIC_MASS_LOSS_SIGMA_PATH,
                        GRIDDED_AREA_CHANGE_FILES_PATH,
                        OUTPUT_DATA_PATH_STRING)
-
-
-
-
