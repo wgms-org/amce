@@ -15,7 +15,9 @@ from pathlib import Path
 from .propagation_ram import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
 
 # For 3_v1.5_csv2netcdf4_globalGrid_0.5.py
+import rioxarray  # Register raterio drivers
 import xarray as xr
+
 
 
 """

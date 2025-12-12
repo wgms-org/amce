@@ -3,7 +3,8 @@
 ## Installation
 
 ```sh
-mamba create --file environment.yaml
+mamba env create --file environment.yaml
+# mamba env update --file environment.yaml --prune
 conda activate ggmc
 ```
 
@@ -25,10 +26,7 @@ The home directory is structured as such:
     - `kriging.py`: a specific set of kriging related functions separated in the original workflow and maintained as separate functions for organization purposes
     - `creation.py`: contains the principal functions from each step of second main part of the original workflow (`version_1.5_LongPeriod_files_creation_ESSD`)
     - `propagation.py` and `propagation_ram.py`: these functions were originally split off separately in the main worklow and were maintained as such; the only difference is the `_ram.py` version has `.values` integrated as specific locations that make it necessary in the 2nd main part of the workflow (i.e., instead of debugging inputs files to work with the standard version, the `_ram.py` was maintained to work with scripts from `version_1.5_LongPeriod_files_creation_ESSD`); this makes it potential priority item for code refactoring
-- `condaenvexport.yml` is a reference of the resolved conda environment from `conda env export --name ggmc` for section 1 (`mb_data_crunching_local`) on an Ubuntu 24 VM
-- `environment.yaml` is the (slightly augmented) YML file used to create the environment (`conda env create -f environment.yaml`) for section 1 (`mb_data_crunching_local`) on an Ubuntu 24 VM
-- `requirements.txt` is the final `pip` compatible environment creation file used on a local MacOS system that runs with both main sections of the workflow (`mb_data_crunching_local` and `version_1.5_LongPeriod_files_creation_ESSD`); the *.txt was created from the `environment.yaml` above in addition to adding 3 packages (noted below)
-    - There are minor additions to this `requirements.txt` for the second main part of the workflow (`version_1.5_LongPeriod_files_creation_ESSD`) that were developed on my local laptop; i.e., the "creation"/second part of the workflow required 3 extra packages on top of the ones from the Conda environment: `xarray`, `rioxarray`, and `netCDF4`.
+- `environment.yaml`: Conda environment file
 - `ggmc_workflow.ipynb` is the centralized workflow script
 
 
