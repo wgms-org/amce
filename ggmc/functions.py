@@ -17,7 +17,7 @@ import time
 import fnmatch
 
 # 4_Kriging_regional_mass_balance
-from .propagation import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
+from .propagation_ram import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
 
 """
 Workflow constants
