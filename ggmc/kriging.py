@@ -1,8 +1,6 @@
 # imported from step 2
 from __future__ import annotations
-from typing import Callable
 import numpy as np
-from scipy.spatial.distance import cdist
 import pandas as pd
 import pyproj
 from pykrige.ok import OrdinaryKriging
