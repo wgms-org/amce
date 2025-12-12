@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Callable
+
 import numpy as np
 from scipy.spatial.distance import cdist, squareform, pdist
 import pandas as pd
@@ -8,7 +9,7 @@ from pykrige.ok import OrdinaryKriging
 
 #################################
 # ESTIMATED CORRELATION FUNCTIONS
-# ################################
+#################################
 
 @np.vectorize
 def sig_rho_dv_spatialcorr(d: np.ndarray, dt: float):

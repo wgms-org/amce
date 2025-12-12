@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Callable
+
 import numpy as np
-from scipy.spatial.distance import cdist, squareform, pdist
+from scipy.spatial.distance import pdist, squareform
 import pandas as pd
 import pyproj
 from pykrige.ok import OrdinaryKriging
@@ -10,7 +11,6 @@ from pykrige.ok import OrdinaryKriging
 # ESTIMATED CORRELATION FUNCTIONS
 #################################
 
-@np.vectorize
 def sig_rho_dv_spatialcorr(d: np.ndarray, dt: float):
     """
     Spatial correlation of error of density of volume change (Huss et al., in prep).
@@ -22,8 +22,6 @@ def sig_rho_dv_spatialcorr(d: np.ndarray, dt: float):
     """
 
     # Parameters estimated in Huss et al. (in prep)
-    if d == 0:
-        return 1
 
     # Two ranges and four parameters to determine partial sills varying with period length
     r1 = 200000
@@ -223,10 +221,8 @@ def reproject_from_latlon(
 
 def double_sum_covar(coords: np.ndarray, errors: np.ndarray, spatialcorr_func: Callable[[np.ndarray], np.ndarray]):
     """
-    Error propagation with spatial correlation, i.e. a double sum of covariance that accepts any correlation
+    Exact error propagation with spatial correlation, i.e. a double sum of covariance that accepts any correlation
     function and expects euclidean coordinates.
-
-    Exact for a small sample size, approximated for a large sample size.
 
     :param coords: Center glacier coordinates, array with size (N,2).
     :param errors: Errors at the glacier coordinates, array with size (N,).
@@ -236,35 +232,17 @@ def double_sum_covar(coords: np.ndarray, errors: np.ndarray, spatialcorr_func: C
     :return: Total variance from double sum.
    """
 
-    # Define random state to subset for speed
-    rng = np.random.default_rng(42)
-
-    # Length of coordinates and subsample size
-    n = len(coords)
-    subsample_size = 10000
-
-    # At maximum, the number of subsamples has to be equal to number of points
-    subsample_size = min(subsample_size, n)
-
-    # Get random subset of points for one of the sums
-    rand_points = rng.choice(n, size=subsample_size, replace=False)
-
-    # Subsample coordinates in 1D
-    sub_coords = coords[rand_points, :]
-    sub_errors = errors[rand_points]
-
     # Compute pairwise distance between all points
-    pds_matrix = cdist(coords, sub_coords, "euclidean")
+    pds = pdist(coords)
 
     # Convert the compact pairwise distance form into a square matrix (N, N)
-    # pds = pdist(coords)
-    # pds_matrix = squareform(pds)
+    pds_matrix = squareform(pds)
 
     # Vectorize double sum calculation for speed
     # First, we compute a matrix of all pairwise errors accounting for spatial correlation
-    mat_var = errors.reshape((-1, 1)) @ sub_errors.reshape((1, -1)) * spatialcorr_func(pds_matrix.flatten()).reshape(pds_matrix.shape)
-    # Then we sum everything and scale by the sample size
-    var = np.sum(mat_var) * n ** 2 / (n * subsample_size)
+    mat_var = errors.reshape((-1, 1)) @ errors.reshape((1, -1)) * spatialcorr_func(pds_matrix.flatten()).reshape(pds_matrix.shape)
+    # Then we sum everything
+    var = np.sum(mat_var)
 
     return np.sqrt(var)
 
