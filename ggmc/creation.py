@@ -7,22 +7,15 @@
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-from glob import glob
-import scipy
 from typing import List
 from pathlib import Path
-from glob import glob
 
 # For 0_v1.6_oce2tiles_0.5_grid_per_region.py
-import time
 from .propagation_ram import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
 
 # For 3_v1.5_csv2netcdf4_globalGrid_0.5.py
 import xarray as xr
-import rioxarray as rio
-import netCDF4
 
 
 """
@@ -47,41 +40,41 @@ def grid_tiles_per_region(fog_version: str,
     Author: ID
     Date: 14 June 2021
     Last changes: 14 June 2021
-    
+
     Scripted for Python 3.7
-    
+
     Description:
     This script reads glacier-wide mass-balance series calculated from OCE and integrates it
     to a global regular grid of 0.5 degrees lat lon
-    
+
     Input: OCE_files_by_region
         _C3S_ELEVATION_CHANGE_SERIES_20200824
         _C3S_MASS_BALANCE_SERIES_20200824(UTF-8 encoding)
-    
+
     Return: gridded glacier mb v1
-    
+
     """
-    
+
     if Path(rgi_path).is_absolute() == True:
         raise ValueError('rgi_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(glims_path).is_absolute() == True:
         raise ValueError('glims_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(output_data_path_string).is_absolute() == True:
         raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
-    
+
     path = os.getcwd()
-    
+
     id_glims_coords_df = pd.read_csv(glims_path, encoding='latin1', delimiter=',', header=0 ,usecols= ['glac_id','CenLat', 'CenLon', 'Area'])
     id_glims_coords_df = id_glims_coords_df.rename(columns={'glac_id': 'GLIMS_ID'}).set_index('GLIMS_ID')
 
     out_dir = Path(output_data_path_string,'Tiles_by_region_'+grid_resolution)
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    
+
     for reg in reg_lst:
-        
+
         print('working in region: ', reg)
         # !! See the note above on the input path for the RGI files
         rgi_file = Path(rgi_path,rgi_code[reg]+'_rgi60_'+rgi_region[reg]+'.csv')
@@ -145,36 +138,36 @@ def oce2tiles_05_grid_per_region(fog_version: str,
     Author: ID
     Date: 14 June 2021
     Last changes: 14 June 2021
-    
+
     Scripted for Python 3.7
-    
+
     Description:
     This script reads glacier-wide mass-balance series calculated from OCE and integrates it
     to a global regular grid of 0.5 degrees lat lon
-    
+
     Input: OCE_files_by_region
         _C3S_ELEVATION_CHANGE_SERIES_20200824
         _C3S_MASS_BALANCE_SERIES_20200824(UTF-8 encoding)
-    
+
     Return: gridded glacier mb v1
-    
+
     """
-    
+
     path = os.getcwd()
-    
+
     if Path(grid_path).is_absolute() == True:
         raise ValueError('grid_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(oce_path).is_absolute() == True:
         raise ValueError('oce_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(output_data_path_string).is_absolute() == True:
         raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
-    
+
     out_dir = output_data_path_string
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    
+
     ######### work on regions with fix lat-lon regional limits
     for region in reg_lst:
 
@@ -376,25 +369,25 @@ def areachange_grid_per_region(fog_version: str,
 
     Return: gridded glacier mb v1
     """
-    
+
     path = os.getcwd()
-    
+
     if Path(grid_path).is_absolute() == True:
         raise ValueError('grid_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(mass_balance_mwe_path).is_absolute() == True:
         raise ValueError('mass_balance_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(mass_balance_sigma_path).is_absolute() == True:
         raise ValueError('mass_balance_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     in_mb_path = mass_balance_mwe_path
     in_sig_mb_path = mass_balance_sigma_path
 
     out_dir = Path(output_data_path_string)
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    
+
     def read_tiles_area_data(region):
         ## Create Regional grid point df: with all glacierized grid points and areas in the region from rgi
         if region == 'SA1':
@@ -497,32 +490,32 @@ def tiles_to_global_grid(fog_version: str,
     """
     There was no included documentation with this function
     """
-    
+
     path = os.getcwd()
-    
+
     if Path(total_mass_loss_mwe_path).is_absolute() == True:
         raise ValueError('total_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(total_mass_loss_sigma_path).is_absolute() == True:
         raise ValueError('total_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(specific_mass_loss_mwe_path).is_absolute() == True:
         raise ValueError('specific_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(specific_mass_loss_sigma_path).is_absolute() == True:
         raise ValueError('specific_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(gridded_area_change_files_path).is_absolute() == True:
         raise ValueError('gridded_area_change_files_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     # gridded Total mass loss files
     filenames_dM_Gt = Path(total_mass_loss_mwe_path).glob('*.csv')
     filenames_sig_dM = Path(total_mass_loss_sigma_path).glob('*.csv')
-    
+
     # gridded Specific mass balance files
     filenames_mb_mwe = Path(specific_mass_loss_mwe_path).glob('*.csv')
     filenames_sig_mb = Path(specific_mass_loss_sigma_path).glob('*.csv')
-    
+
     # gridded area change files
     filenames_area= Path(gridded_area_change_files_path).glob('*.csv')
 
@@ -531,7 +524,7 @@ def tiles_to_global_grid(fog_version: str,
     out_dir = Path(output_data_path_string)
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    
+
     #Create an empty dataframe with gridded 0.5 x 0.5 degrees
     lat_lst= np.arange(-89.75, 89.751, 0.5).tolist()
     lat_lst=lat_lst[::-1]
@@ -657,32 +650,32 @@ def csv2netcdf4_globalGrid(fog_version: str,
     """
     There was no included documentation with this function
     """
-    
+
     path = os.getcwd()
-    
+
     if Path(total_mass_loss_mwe_path).is_absolute() == True:
         raise ValueError('total_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(total_mass_loss_sigma_path).is_absolute() == True:
         raise ValueError('total_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(specific_mass_loss_mwe_path).is_absolute() == True:
         raise ValueError('specific_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(specific_mass_loss_sigma_path).is_absolute() == True:
         raise ValueError('specific_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     if Path(gridded_area_change_files_path).is_absolute() == True:
         raise ValueError('gridded_area_change_files_path must be provided as a relative path from the working directory of your workflow script.')
-    
+
     yr_lst = np.arange(ymin, ymax+1).tolist()
-    
+
     if Path(output_data_path_string).is_absolute() == True:
         raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
     out_dir = Path(output_data_path_string)
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
-    
+
     # Define the compression settings
     comp = dict(zlib=True, complevel=5)
 
@@ -711,7 +704,7 @@ def csv2netcdf4_globalGrid(fog_version: str,
 
         time = pd.date_range(start=str(year), periods=12, freq='MS')
         print(pd.date_range(start=str(year), periods=12, freq='MS'))
-        
+
         # Read glacier mass change data as xarray with lat, lon, time dimensions
         Glacier_newformat = xr.DataArray(data=gla_gt_df, dims=['lat', 'lon'], coords={'lat': lat, 'lon': lon})
         Glacier_newformat_mwe = xr.DataArray(data=gla_mwe_df, dims=['lat', 'lon'], coords={'lat': lat, 'lon': lon})

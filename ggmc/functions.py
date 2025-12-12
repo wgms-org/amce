@@ -1,10 +1,8 @@
 """functions"""
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
-import scipy  # usage: scipy.stats.funct()
 from pathlib import Path
 import math
 from .helpers import *
