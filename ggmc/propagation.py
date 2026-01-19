@@ -259,22 +259,22 @@ def wrapper_latlon_double_sum_covar(df: pd.DataFrame, spatialcorr_func: Callable
     """
 
     # Get median latitude and longitude among all values
-    med_lat = np.median(df.lat)
-    med_lon = np.median(df.lon)
+    med_lat = df['lat'].median()
+    med_lon = df['lon'].median()
 
     # Find the metric (UTM) system centered on these coordinates
     utm_zone = latlon_to_utm(med_lat, med_lon)
     epsg = utm_to_epsg(utm_zone)
 
     # Reproject latitude and longitude to easting/northing
-    easting, northing = reproject_from_latlon((df.lat, df.lon),
-                                              out_crs=pyproj.CRS.from_epsg(epsg))
+    easting, northing = reproject_from_latlon(
+        df[['lat', 'lon']].values.T, out_crs=pyproj.CRS.from_epsg(epsg)
+    )
     coords = np.array([easting, northing]).T
 
-    # Extract errors
-    errors = df.errors
-
-    return double_sum_covar(coords=coords, errors=errors, spatialcorr_func=spatialcorr_func)
+    return double_sum_covar(
+        coords=coords, errors=df['errors'].values, spatialcorr_func=spatialcorr_func
+    )
 
 
 ##################################################

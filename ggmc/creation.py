@@ -1,209 +1,123 @@
-"""creation"""
-
-"""
-!! These functions are pulled from the "second part" of the collected files; i.e., they
-!! include the functions from the directory titled "version_1.5_LongPeriod_files_creation_ESSD"
-"""
-
+from typing import Dict, List
+from pathlib import Path
 import os
+
 import numpy as np
 import pandas as pd
-from typing import List
-from pathlib import Path
-
-# For 0_v1.6_oce2tiles_0.5_grid_per_region.py
-from .propagation_ram import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
-
-# For 3_v1.5_csv2netcdf4_globalGrid_0.5.py
 import rioxarray  # Register raterio drivers
 import xarray as xr
 
+from .propagation_ram import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
 
 
-"""
-Functions begin here
-"""
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 0_v1.6_grid_tiles_per_region.py
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-def grid_tiles_per_region(fog_version: str,
-                          rgi_region: dict,
-                          rgi_code: dict,
-                          reg_lst: List[str],
-                          ini_yr_obs: int,
-                          end_yr_obs: int,
-                          rgi_path: str, # !! pointing to the original `00_rgi60_attribs` subdirectory, specifically
-                          glims_path: str,
-                          output_data_path_string: str,
-                          grid_resolution: str = '0.5') -> None:
+def grid_tiles_per_region(
+    rgi_region: Dict[str, str],
+    rgi_code: Dict[str, str],
+    regions: List[str],
+    rgi_attribute_dir: Path,
+    glims_attribute_area_file: Path,
+    regional_tile_dir: Path
+) -> None:
     """
-    Author: ID
-    Date: 14 June 2021
-    Last changes: 14 June 2021
-
-    Scripted for Python 3.7
-
-    Description:
-    This script reads glacier-wide mass-balance series calculated from OCE and integrates it
-    to a global regular grid of 0.5 degrees lat lon
-
-    Input: OCE_files_by_region
-        _C3S_ELEVATION_CHANGE_SERIES_20200824
-        _C3S_MASS_BALANCE_SERIES_20200824(UTF-8 encoding)
-
-    Return: gridded glacier mb v1
-
+    Computes glacier area on a 0.5 x 0.5 degree grid by region based on RGI/GLIMS.
     """
+    regional_tile_dir.mkdir(parents=True, exist_ok=True)
 
-    if Path(rgi_path).is_absolute() == True:
-        raise ValueError('rgi_path must be provided as a relative path from the working directory of your workflow script.')
+    for region in regions:
+        print(region)
 
-    if Path(glims_path).is_absolute() == True:
-        raise ValueError('glims_path must be provided as a relative path from the working directory of your workflow script.')
+        if region == 'CAU':
+            rgi_df = pd.read_csv(
+                glims_attribute_area_file, usecols=['glac_id', 'CenLat', 'CenLon', 'Area']
+            )
+            rgi_df.rename(columns={'glac_id': 'GLIMS_ID'}, inplace=True)
+            rgi_df.set_index('GLIMS_ID', inplace=True)
+        else:
+            rgi_file = rgi_attribute_dir / f'{rgi_code[region]}_rgi60_{rgi_region[region]}.csv'
+            rgi_df = pd.read_csv(rgi_file, usecols=['RGIId', 'CenLon', 'CenLat', 'Area', 'Connect'], encoding='latin1', index_col='RGIId')
+            if region == 'GRL':
+                rgi_df = rgi_df[rgi_df['Connect'] != 2].copy()
 
-    if Path(output_data_path_string).is_absolute() == True:
-        raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
+        # TODO: Why would this be necessary?
+        # Drop duplicates
+        rgi_df.drop_duplicates(subset=None, keep='first', inplace=True)
 
-    path = os.getcwd()
-
-    id_glims_coords_df = pd.read_csv(glims_path, encoding='latin1', delimiter=',', header=0 ,usecols= ['glac_id','CenLat', 'CenLon', 'Area'])
-    id_glims_coords_df = id_glims_coords_df.rename(columns={'glac_id': 'GLIMS_ID'}).set_index('GLIMS_ID')
-
-    out_dir = Path(output_data_path_string,'Tiles_by_region_'+grid_resolution)
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
-
-    for reg in reg_lst:
-
-        print('working in region: ', reg)
-        # !! See the note above on the input path for the RGI files
-        rgi_file = Path(rgi_path,rgi_code[reg]+'_rgi60_'+rgi_region[reg]+'.csv')
-        rgi_df = pd.read_csv(rgi_file, encoding='latin-1', delimiter=',', header=0, usecols=['RGIId', 'CenLon','CenLat','Area','Connect'] ,index_col='RGIId')
-
-        if reg == 'CAU':
-            rgi_df = id_glims_coords_df
-
-        if reg == 'GRL':
-            greenland_l2_df = rgi_df.loc[(rgi_df['Connect']==2)]
-            L2_lst = greenland_l2_df.index.to_list()
-            rgi_df = rgi_df[~rgi_df.index.isin(L2_lst)]
-
-
-        ## Define coordinates of 0.5 x 0.5 degrees grid cel where the glacier belongs
+        # Define coordinates of 0.5 x 0.5 degrees grid cell where the glacier belongs
+        # TODO: Vectorise and generalise to arbitrary grid resolution
         cen_lon_grid_lst = []
         cen_lat_grid_lst = []
-        for index, row in rgi_df.iterrows():
-            lon= row['CenLon']
-            lat= row['CenLat']
-
-            if round(lon)<lon:
-                if int(round(lat))>lat:
-                    cen_lon_grid= round(lon)+ 0.25
-                    cen_lat_grid= int(round(lat))- 0.25
+        for _, row in rgi_df.iterrows():
+            lon = row['CenLon']
+            lat = row['CenLat']
+            if round(lon) < lon:
+                if round(lat) > lat:
+                    cen_lon_grid = round(lon) + 0.25
+                    cen_lat_grid = round(lat) - 0.25
                 else:
-                    cen_lon_grid= round(lon)+ 0.25
-                    cen_lat_grid= int(round(lat))+ 0.25
-
-            else: # round(lon)>lon
-                if round(lat)>lat:
-                    cen_lon_grid= round(lon)- 0.25
-                    cen_lat_grid= int(round(lat))- 0.25
+                    cen_lon_grid = round(lon) + 0.25
+                    cen_lat_grid = round(lat) + 0.25
+            else:
+                if round(lat) > lat:
+                    cen_lon_grid = round(lon) - 0.25
+                    cen_lat_grid = round(lat) - 0.25
                 else:
-                    cen_lon_grid= round(lon)- 0.25
-                    cen_lat_grid= int(round(lat))+ 0.25
+                    cen_lon_grid = round(lon) - 0.25
+                    cen_lat_grid = round(lat) + 0.25
 
             cen_lon_grid_lst.append(cen_lon_grid)
             cen_lat_grid_lst.append(cen_lat_grid)
 
         rgi_df['LON_GRID'] = cen_lon_grid_lst
         rgi_df['LAT_GRID'] = cen_lat_grid_lst
-        rgi_df = rgi_df.drop_duplicates(subset=None, keep='first', inplace=False)
 
-        rgi_grid_df = rgi_df['Area'].groupby([rgi_df['LON_GRID'], rgi_df['LAT_GRID']]).sum()
-        rgi_grid_df.to_csv(Path(out_dir,'Tiles_'+grid_resolution+'_region_'+rgi_code[reg]+'_'+reg+'.csv'))
+        rgi_grid_df = rgi_df.groupby(['LON_GRID', 'LAT_GRID'])['Area'].sum()
+        rgi_grid_df.to_csv(regional_tile_dir / f'{region}.csv')
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 0_v1.6_oce2tiles_0.5_grid_per_region.py
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def oce2tiles_05_grid_per_region(fog_version: str,
-                                 rgi_code: dict,
-                                 reg_lst: List[str],
-                                 ymin: int,
-                                 ymax: int,
-                                 grid_path: str,
-                                 oce_path: str,
-                                 output_data_path_string: str) -> None:
-    """
-    Author: ID
-    Date: 14 June 2021
-    Last changes: 14 June 2021
-
-    Scripted for Python 3.7
-
-    Description:
-    This script reads glacier-wide mass-balance series calculated from OCE and integrates it
-    to a global regular grid of 0.5 degrees lat lon
-
-    Input: OCE_files_by_region
-        _C3S_ELEVATION_CHANGE_SERIES_20200824
-        _C3S_MASS_BALANCE_SERIES_20200824(UTF-8 encoding)
-
-    Return: gridded glacier mb v1
-
-    """
-
-    path = os.getcwd()
-
-    if Path(grid_path).is_absolute() == True:
-        raise ValueError('grid_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(oce_path).is_absolute() == True:
-        raise ValueError('oce_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(output_data_path_string).is_absolute() == True:
-        raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
-
-    out_dir = output_data_path_string
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+def oce2tiles_05_grid_per_region(
+    regions: List[str],
+    ymin: int,
+    ymax: int,
+    regional_tile_dir: Path,
+    oce_dir: Path,
+    oce_tile_dir: Path
+) -> None:
+    oce_tile_dir.mkdir(parents=True, exist_ok=True)
 
     ######### work on regions with fix lat-lon regional limits
-    for region in reg_lst:
-
-        print('Working on region: ', region)
+    for region in regions:
+        print(region)
 
         # Read mean estimate and errors
-        file_oce = Path(oce_path, region + "_gla_MEAN-CAL-mass-change-series_obs_unobs.csv")
-        file_sig_tot = Path(oce_path, region + "_gla_mean-cal-mass-change_TOTAL-ERROR_obs_unobs.csv")
-        file_sig_dh = Path(oce_path, region + "_gla_mean-cal-mass-change_DH-ERROR_obs_unobs.csv")
-        file_sig_rho = Path(oce_path, region + "_gla_mean-cal-mass-change_RHO-ERROR_obs_unobs.csv")
-        file_sig_anom = Path(oce_path, region + "_gla_mean-cal-mass-change_ANOM-ERROR_obs_unobs.csv")
+        file_oce = oce_dir / f'{region}_gla_MEAN-CAL-mass-change-series_obs_unobs.csv'
+        file_sig_dh = oce_dir / f'{region}_gla_mean-cal-mass-change_DH-ERROR_obs_unobs.csv'
+        file_sig_rho = oce_dir / f'{region}_gla_mean-cal-mass-change_RHO-ERROR_obs_unobs.csv'
+        file_sig_anom = oce_dir / f'{region}_gla_mean-cal-mass-change_ANOM-ERROR_obs_unobs.csv'
 
-        oce_df = pd.read_csv(file_oce, sep=',', header=0)
-        sig_df = pd.read_csv(file_sig_tot, sep=',', header=0)
-        sig_dh_df = pd.read_csv(file_sig_dh, sep=',', header=0)
-        sig_rho_df = pd.read_csv(file_sig_rho, sep=',', header=0)
-        sig_anom_df = pd.read_csv(file_sig_anom, sep=',', header=0)
+        oce_df = pd.read_csv(file_oce)
+        sig_dh_df = pd.read_csv(file_sig_dh)
+        sig_rho_df = pd.read_csv(file_sig_rho)
+        sig_anom_df = pd.read_csv(file_sig_anom)
 
         # Read tiles for this region
         if region == 'SA1':
-            file_grid = Path(grid_path, 'Tiles_0.5_region_' + rgi_code[region] + '_SAN.csv')
-            grid_df = pd.read_csv(file_grid, sep=',', header=0)
-            grid_df = grid_df.loc[(grid_df['LAT_GRID'] < -45.50)]
+            file_grid = regional_tile_dir / 'SAN.csv'
+            grid_df = pd.read_csv(file_grid)
+            grid_df = grid_df.loc[grid_df['LAT_GRID'] < -45.50]
         elif region == 'SA2':
-            file_grid = Path(grid_path, 'Tiles_0.5_region_' + rgi_code[region] + '_SAN.csv')
-            grid_df = pd.read_csv(file_grid, sep=',', header=0)
-            grid_df = grid_df.loc[(grid_df['LAT_GRID'] > -45.50)]
+            file_grid = regional_tile_dir / 'SAN.csv'
+            grid_df = pd.read_csv(file_grid)
+            grid_df = grid_df.loc[grid_df['LAT_GRID'] > -45.50]
             grid_df = grid_df.reset_index()
         else:
-            file_grid = Path(grid_path, 'Tiles_0.5_region_'+rgi_code[region]+'_'+region+'.csv')
-            grid_df = pd.read_csv(file_grid, sep=',', header=0)
+            file_grid = regional_tile_dir / f'{region}.csv'
+            grid_df = pd.read_csv(file_grid)
 
         # List years to process
-        list_years = np.arange(ymin, ymax+1)
+        list_years = np.arange(ymin, ymax + 1)
 
         # We can't apply to the whole YEAR/ID dataframe at once here, we need to loop for each YEAR of the dataframes
         # to compute the pairwise error propagation for dh and density across all glaciers of that year
@@ -270,8 +184,8 @@ def oce2tiles_05_grid_per_region(fog_version: str,
                 sig_dh_obs = wrapper_latlon_double_sum_covar(yearly_dh_df, spatialcorr_func=sig_dh_spatialcorr)
 
                 # Check propagation works as intended: final estimate is between fully correlated and independent
-                sig_dh_fullcorr = np.sum(yearly_dh_df["errors"])
-                sig_dh_uncorr = np.sqrt(np.sum(yearly_dh_df["errors"] ** 2))
+                # sig_dh_fullcorr = np.sum(yearly_dh_df["errors"])
+                # sig_dh_uncorr = np.sqrt(np.sum(yearly_dh_df["errors"] ** 2))
                 # print(f"{sig_dh_uncorr}, {sig_dh_obs}, {sig_dh_fullcorr}")
                 # assert sig_dh_uncorr <= sig_dh_obs <= sig_dh_fullcorr
 
@@ -288,8 +202,8 @@ def oce2tiles_05_grid_per_region(fog_version: str,
                 sig_rho_obs = wrapper_latlon_double_sum_covar(yearly_rho_df, spatialcorr_func=sig_rho_dv_spatialcorr_yearly)
 
                 # Check propagation works as intended: final estimate is between fully correlated and independent
-                sig_rho_fullcorr = np.sum(yearly_rho_df["errors"])
-                sig_rho_uncorr = np.sqrt(np.sum(yearly_rho_df["errors"] ** 2))
+                # sig_rho_fullcorr = np.sum(yearly_rho_df["errors"])
+                # sig_rho_uncorr = np.sqrt(np.sum(yearly_rho_df["errors"] ** 2))
 
                 # 4/ Spatial correlations for anom
 
@@ -301,8 +215,8 @@ def oce2tiles_05_grid_per_region(fog_version: str,
                 sig_anom_obs = wrapper_latlon_double_sum_covar(yearly_anom_df, spatialcorr_func=ba_anom_spatialcorr)
 
                 # Check propagation works as intended: final estimate is between fully correlated and independent
-                sig_anom_fullcorr = np.sum(yearly_anom_df["errors"])
-                sig_anom_uncorr = np.sqrt(np.sum(yearly_anom_df["errors"] ** 2))
+                # sig_anom_fullcorr = np.sum(yearly_anom_df["errors"])
+                # sig_anom_uncorr = np.sqrt(np.sum(yearly_anom_df["errors"] ** 2))
 
                 # Append all outputs to list for each yearly period
                 df_out = pd.DataFrame(data={"tile_lon": [grid_lon], "tile_lat": [grid_lat], "year": [year], "mb": [mb],
@@ -332,12 +246,11 @@ def oce2tiles_05_grid_per_region(fog_version: str,
         df_sig_tot_out = df_out_reg[["tile_lat", "tile_lon", "year", "sig_tot"]]
         df_sig_tot_out = df_sig_tot_out.pivot(index=["tile_lat", "tile_lon"], columns='year', values='sig_tot')
 
-        df_mb_out.to_csv(Path(out_dir, region+"_MB_mwe_grid_0.5.csv"), index_label=["LAT_GRID", "LON_GRID"])
-        df_sig_dh_out.to_csv(Path(out_dir, region+"_sigma_dh_grid_0.5.csv"), index_label=["LAT_GRID", "LON_GRID"])
-        df_sig_anom_out.to_csv(Path(out_dir, region+"_sigma_anom_grid_0.5.csv"), index_label=["LAT_GRID", "LON_GRID"])
-        df_sig_rho_out.to_csv(Path(out_dir, region+"_sigma_rho_grid_0.5.csv"), index_label=["LAT_GRID", "LON_GRID"])
-        df_sig_tot_out.to_csv(Path(out_dir, region+"_sigma_TOTAL_grid_0.5.csv"), index_label=["LAT_GRID", "LON_GRID"])
-
+        df_mb_out.to_csv(oce_tile_dir / f'{region}_MB_mwe_grid_0.5.csv', index_label=["LAT_GRID", "LON_GRID"])
+        df_sig_dh_out.to_csv(oce_tile_dir / f'{region}_sigma_dh_grid_0.5.csv', index_label=["LAT_GRID", "LON_GRID"])
+        df_sig_anom_out.to_csv(oce_tile_dir / f'{region}_sigma_anom_grid_0.5.csv', index_label=["LAT_GRID", "LON_GRID"])
+        df_sig_rho_out.to_csv(oce_tile_dir / f'{region}_sigma_rho_grid_0.5.csv', index_label=["LAT_GRID", "LON_GRID"])
+        df_sig_tot_out.to_csv(oce_tile_dir / f'{region}_sigma_TOTAL_grid_0.5.csv', index_label=["LAT_GRID", "LON_GRID"])
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 1_v1.5_mwe2Gt_AreaChange_0.5_grid_per_region.py
