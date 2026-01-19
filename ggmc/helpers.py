@@ -1,58 +1,62 @@
 """helpers"""
+from matplotlib import dates
 import numpy as np
 import pandas as pd
 from typing import List
 
-def date_format(month: int,
-                year: int):
+
+def wgms_date_to_decimal_year(date: pd.Series) -> pd.Series:
     """
-    A simple function to make decimal year.
+    Convert WGMS date (yyyymmdd) to decimal year, ignoring day.
+
+    Unknown month are represented as 99 and set to June (6).
+
+    Example
+    -------
+    >>> date = pd.Series([20000115, 20010620, 20029999])
+    >>> wgms_date_to_decimal_year(date)
+    0    2000.000000
+    1    2001.416667
+    2    2002.416667
+    dtype: float64
+    """
+    date = date.astype('string')
+    years = date.str.slice(0, 4).astype(int)
+    months = date.str.slice(4, 6).replace('99', '06').astype(int)
+    return years + (1 / 12 * (months.fillna(6) - 1))
+
+
+def change_to_rate(
+    change: pd.Series,
+    begin_date: pd.Series,
+    end_date: pd.Series
+) -> pd.Series:
+    """
+    Convert change to change rate.
 
     Parameters
     ----------
-    month: int
-    The integer value of an inputted month (i.e., values ranging from 1 to 12)
-    year : int
-    The integer value for the year
+    change: float
+        Change value.
+    begin_date: float
+        Begin date in decimal format.
+    end_date: float
+        End date in decimal format.
 
-    Returns
+    Example
     -------
-    float
-        A floating point decimal year number.
-
+    >>> change = pd.Series([-10, 5, 1])
+    >>> begin_date = pd.Series([2000.0, 2001.0, 2002.0])
+    >>> end_date = pd.Series([2001.0, 2003.0, 2002.0])
+    >>> change_to_rate(change, begin_date, end_date)
+    0   -10.0
+    1     2.5
+    2     1.0
+    dtype: float64
     """
-    default_month = 6
-    month=default_month if month > 12.0 else month
-    offset = year + (1.0 / 12 * (month - 1))
-    return offset
+    duration = end_date - begin_date
+    return (change / duration).where(duration != 0, change)
 
-
-def cum_to_rate(elev_chg_cum: float,
-                sur_date: float,
-                ref_date: float):
-    """
-    A simple function to transform cumulative elevation changes to rate
-
-    Parameters
-    ----------
-    elev_chg_cum: float
-    Numeric value for the elevation change from the dataset (column "ELEVATION_CHANGE" in "FOG_ELEVATION_CHANGE_DATA_2025-01.csv")
-    sur_date: float
-    Floating point decimal year for the "SURVEY_DATE" column value of "FOG_ELEVATION_CHANGE_DATA_2025-01.csv" (formatted via the date_format() function)
-    ref_date: float
-    Floating point decimal year for the "REFERENCE_DATE" column value of "FOG_ELEVATION_CHANGE_DATA_2025-01.csv" (formatted via the date_format() function)
-
-    Returns
-    -------
-    float
-        A floating point decimal value for the elevation rate of change
-
-    """
-    if (sur_date-ref_date) != 0:
-        elev_chg_rate = elev_chg_cum/(sur_date-ref_date) if elev_chg_cum != 0 else elev_chg_cum
-        return elev_chg_rate
-    else:
-        return elev_chg_cum
 
 def create_mb_dataframe(in_df: pd.DataFrame,
                         id_lst: List[str],
@@ -119,13 +123,11 @@ def calc_anomalies(in_df, ref_period, region):
 
     # create subset of glacier ids with good data over reference period
     good_ids_in_ref_df = in_ref_df[ref_period_id_lst]
-    good_ids_in_df=in_df[ref_period_id_lst]
+    good_ids_in_df = in_df[ref_period_id_lst]
 
     # calculate anomaly (x_i-x_avg) for data over reference period
     avg_ref_df = good_ids_in_ref_df.mean()
     anomaly_ref_df = round(good_ids_in_df - avg_ref_df, 0)
-    # print(anomaly_ref_df)
-    print('done.')
     return anomaly_ref_df
 
 def calc_anomalies_unc(in_df, in_unc_df, ref_period, region):
@@ -141,15 +143,14 @@ def calc_anomalies_unc(in_df, in_unc_df, ref_period, region):
 
     # calculate mb uncertainty of glacier ids with good data over reference period
     unc_ref_df = in_unc_df[ref_period_id_lst]
-    reg_unc_mean= np.nanmean(unc_ref_df)
+    reg_unc_mean = np.nanmean(unc_ref_df)
 
     print(unc_ref_df)
     print(reg_unc_mean)
 
     for id in ref_period_id_lst:
-        # id=0
         year_min = in_df[id].first_valid_index()
-        yrs= list(range(1915,year_min))
+        yrs = list(range(1915, year_min))
 
         if unc_ref_df[id].isnull().all():
             unc_ref_df[id][id].fillna(reg_unc_mean, inplace=True)
@@ -159,19 +160,19 @@ def calc_anomalies_unc(in_df, in_unc_df, ref_period, region):
         unc_ref_df[id].mask(unc_ref_df.index.isin(yrs), np.nan, inplace=True)
 
         print(unc_ref_df[id])
-        # exit()
-    print('done.')
+
     return unc_ref_df
 
 def calc_spt_anomalies_unc(in_df, in_unc_df, id_lst):
     """This function calculates the uncertainties of glacier mass balances series"""
 
     # calculate mb uncertainty of glacier ids with good data over reference period
-    unc_ref_df = in_unc_df[id_lst]
+    unc_ref_df = in_unc_df[id_lst].copy()
     reg_unc_mean= np.nanmean(unc_ref_df)
 
     for id in unc_ref_df.columns:
         year_min = in_df[id].first_valid_index()
+        # TODO: Move 1915 to parameter or constant
         yrs= list(range(1915,year_min))
 
         if unc_ref_df[id].isnull().all():
@@ -181,7 +182,6 @@ def calc_spt_anomalies_unc(in_df, in_unc_df, id_lst):
 
         unc_ref_df[id].mask(unc_ref_df.index.isin(yrs), np.nan, inplace=True)
 
-    print('done.')
     return unc_ref_df
 
 def dis_fil(row, ini_date, fin_date):
@@ -189,5 +189,4 @@ def dis_fil(row, ini_date, fin_date):
         return row - fin_date + 1
     if row <= ini_date:
         return ini_date + 2 - row
-    else:
-        return 1.0
+    return 1.0
