@@ -1,13 +1,11 @@
 import math
-import os
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-import pyproj
 
-from . import helpers, kriging, propagation
+from ggmc import helpers, kriging, propagation_ezw
 
 
 def format_mass_balance_data(
@@ -914,75 +912,15 @@ def calculate_regional_mass_balance(
 
         Reg_mb_df[region] = Aw_oce_obs
 
-        # We can't apply to the whole YEAR/ID dataframe at once here, we need to loop for each YEAR of the dataframes
-        # to compute the pairwise error propagation for dh and density across all glaciers of that year
-        list_sig_dh_yearly = []
-        list_sig_rho_yearly = []
-        list_sig_anom_yearly = []
-
-        # Spatial correlation for rho for a 1-year period
-        def sig_rho_dv_spatialcorr_yearly(d):
-            return propagation.sig_rho_dv_spatialcorr(d, dt=1)
-
-        # !! Project coordinates outside loop
-        # Get median latitude and longitude among all values
-        med_lat = np.median(list_lat)
-        med_lon = np.median(list_lon)
-        # Find the metric (UTM) system centered on these coordinates
-        utm_zone = propagation.latlon_to_utm(lat=med_lat, lon=med_lon)
-        epsg = propagation.utm_to_epsg(utm_zone)
-        # Reproject latitude and longitude to easting/northing
-        easting, northing = propagation.reproject_from_latlon(
-            [list_lat, list_lon], out_crs=pyproj.CRS.from_epsg(epsg)
+        list_sig_dh_yearly, list_sig_rho_yearly, list_sig_anom_yearly = propagation_ezw.regional_sigma_wrapper(
+            latitude=np.asarray(list_lat),
+            longitude=np.asarray(list_lon),
+            sigma_dh=rel_sig_dh_mb_df.values,
+            sigma_rho=rel_sig_rho_mb_df.values,
+            sigma_anom=rel_sig_anom_mb_df.values,
+            by_year=True,
+            verbose=True
         )
-        coords = np.column_stack([easting, northing])
-
-        for year in rel_sig_dh_mb_df.index:
-            print(year)
-
-            # Spatial correlation for dh
-            yearly_dh_errors = rel_sig_dh_mb_df.loc[year].values
-            sig_dh_obs = propagation.double_sum_covar(
-                coords=coords,
-                errors=yearly_dh_errors,
-                spatialcorr_func=propagation.sig_dh_spatialcorr
-            )
-            # # Check final estimate is between fully correlated and independent
-            # sig_dh_fullcorr = np.sum(yearly_dh_errors)
-            # sig_dh_uncorr = np.sqrt(np.sum(yearly_dh_errors**2))
-            # print(f"{sig_dh_uncorr}, {sig_dh_obs}, {sig_dh_fullcorr}")
-            # assert sig_dh_uncorr <= sig_dh_obs <= sig_dh_fullcorr
-
-            # Spatial correlation for rho
-            yearly_rho_errors = rel_sig_rho_mb_df.loc[year].values
-            sig_rho_obs = propagation.double_sum_covar(
-                coords=coords,
-                errors=yearly_rho_errors,
-                spatialcorr_func=sig_rho_dv_spatialcorr_yearly
-            )
-            # # Check propagation works as intended: final estimate is between fully correlated and independent
-            # sig_rho_fullcorr = np.sum(yearly_rho_errors)
-            # sig_rho_uncorr = np.sqrt(np.sum(yearly_rho_errors ** 2))
-            # print(f"{sig_rho_uncorr}, {sig_rho_obs}, {sig_rho_fullcorr}")
-            # assert sig_rho_uncorr <= sig_rho_obs <= sig_rho_fullcorr
-
-            # Spatial correlation for anom
-            yearly_anom_errors = rel_sig_anom_mb_df.loc[year].values
-            sig_anom_obs = propagation.double_sum_covar(
-                coords=coords,
-                errors=yearly_anom_errors,
-                spatialcorr_func=propagation.ba_anom_spatialcorr
-            )
-            # # Check propagation works as intended: final estimate is between fully correlated and independent
-            # sig_anom_fullcorr = np.sum(yearly_anom_errors)
-            # sig_anom_uncorr = np.sqrt(np.sum(yearly_anom_errors**2))
-            # print(f"{sig_anom_uncorr}, {sig_anom_obs}, {sig_anom_fullcorr}")
-            # assert sig_anom_uncorr <= sig_anom_obs <= sig_anom_fullcorr
-
-            # Append to list for each yearly period
-            list_sig_dh_yearly.append(sig_dh_obs)
-            list_sig_rho_yearly.append(sig_rho_obs)
-            list_sig_anom_yearly.append(sig_anom_obs)
 
         # Format results as indexed series
         # TODO: Why sig_anom_oce_df and not oce_df for index?

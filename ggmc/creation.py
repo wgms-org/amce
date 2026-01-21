@@ -7,7 +7,7 @@ import pandas as pd
 import rioxarray  # Register raterio drivers
 import xarray as xr
 
-from .propagation import wrapper_latlon_double_sum_covar, sig_dh_spatialcorr, sig_rho_dv_spatialcorr, ba_anom_spatialcorr
+from ggmc import propagation_ezw
 
 
 def grid_tiles_per_region(
@@ -124,11 +124,11 @@ def oce2tiles_05_grid_per_region(
         list_df_out = []
 
         # Loop through all tiles
-        for idx_tile in range(len(grid_df)):
+        for idx_tile in grid_df.index:
 
-            grid_lat = grid_df["LAT_GRID"][idx_tile]
-            grid_lon = grid_df["LON_GRID"][idx_tile]
-            grid_area = grid_df["Area"][idx_tile]
+            grid_lat = grid_df["LAT_GRID"].loc[idx_tile]
+            grid_lon = grid_df["LON_GRID"].loc[idx_tile]
+            grid_area = grid_df["Area"].loc[idx_tile]
 
             print(f"Working on tile: {grid_lon},{grid_lat}")
 
@@ -147,82 +147,33 @@ def oce2tiles_05_grid_per_region(
             lons_tile = oce_df_tile["CenLon"]
             areas = oce_df_tile["Area"]
 
-            # Initialize dataframes for error propagation
-            yearly_dh_df = pd.DataFrame()
-            yearly_dh_df["lat"] = lats_tile
-            yearly_dh_df["lon"] = lons_tile
+            # TODO: Pre-format oce_df_tile outside tile loop
+            area_weights = np.atleast_2d(areas / grid_area)
+            year_columns = [str(year) for year in list_years]
+            mean_df = oce_df_tile[year_columns].transpose().values * area_weights
+            mb = mean_df.sum(axis=1)
+            sigma_dh = sig_dh_df_tile[year_columns].transpose().values * area_weights
+            sigma_rho = sig_rho_df_tile[year_columns].transpose().values * area_weights
+            sigma_anom = sig_anom_df_tile[year_columns].transpose().values * area_weights
 
-            yearly_rho_df = pd.DataFrame()
-            yearly_rho_df["lat"] = lats_tile
-            yearly_rho_df["lon"] = lons_tile
-
-            yearly_anom_df = pd.DataFrame()
-            yearly_anom_df["lat"] = lats_tile
-            yearly_anom_df["lon"] = lons_tile
-
-
-            # Loop for all years
-            for year in list_years:
-
-                print(f"Propagating uncertainties for year {year}")
-                year_str_idx = str(year)
-
-                # 1/ Mean estimate aggregation
-
-                yearly_mean_df = oce_df_tile[year_str_idx]
-                # Area-weighting for the tile
-                yearly_mean_df = yearly_mean_df * areas / grid_area
-                mb = np.sum(yearly_mean_df)
-
-                # 2/ Spatial correlations for dh
-
-                # Create dataframe with dh errors, lat and lon
-                yearly_dh_df["errors"] = sig_dh_df_tile[year_str_idx]
-                # Area-weighting for the tile
-                yearly_dh_df["errors"] = yearly_dh_df["errors"] * areas / grid_area
-
-                sig_dh_obs = wrapper_latlon_double_sum_covar(yearly_dh_df, spatialcorr_func=sig_dh_spatialcorr)
-
-                # Check propagation works as intended: final estimate is between fully correlated and independent
-                # sig_dh_fullcorr = np.sum(yearly_dh_df["errors"])
-                # sig_dh_uncorr = np.sqrt(np.sum(yearly_dh_df["errors"] ** 2))
-                # print(f"{sig_dh_uncorr}, {sig_dh_obs}, {sig_dh_fullcorr}")
-                # assert sig_dh_uncorr <= sig_dh_obs <= sig_dh_fullcorr
-
-                # 3/ Spatial correlation for rho for a 1-year period
-
-                # Create dataframe with rho errors, lat and lon
-                yearly_rho_df["errors"] = sig_rho_df_tile[year_str_idx]
-                # Area-weighting for the tile
-                yearly_rho_df["errors"] = yearly_rho_df["errors"] * areas / grid_area
-
-                def sig_rho_dv_spatialcorr_yearly(d):
-                    return sig_rho_dv_spatialcorr(d, dt=1)
-
-                sig_rho_obs = wrapper_latlon_double_sum_covar(yearly_rho_df, spatialcorr_func=sig_rho_dv_spatialcorr_yearly)
-
-                # Check propagation works as intended: final estimate is between fully correlated and independent
-                # sig_rho_fullcorr = np.sum(yearly_rho_df["errors"])
-                # sig_rho_uncorr = np.sqrt(np.sum(yearly_rho_df["errors"] ** 2))
-
-                # 4/ Spatial correlations for anom
-
-                # Create dataframe with anom errors, lat and lon
-                yearly_anom_df["errors"] = sig_anom_df_tile[year_str_idx]
-                # Area-weighting for the tile
-                yearly_anom_df["errors"] = yearly_anom_df["errors"] * areas / grid_area
-
-                sig_anom_obs = wrapper_latlon_double_sum_covar(yearly_anom_df, spatialcorr_func=ba_anom_spatialcorr)
-
-                # Check propagation works as intended: final estimate is between fully correlated and independent
-                # sig_anom_fullcorr = np.sum(yearly_anom_df["errors"])
-                # sig_anom_uncorr = np.sqrt(np.sum(yearly_anom_df["errors"] ** 2))
-
-                # Append all outputs to list for each yearly period
-                df_out = pd.DataFrame(data={"tile_lon": [grid_lon], "tile_lat": [grid_lat], "year": [year], "mb": [mb],
-                                            "sig_dh": [sig_dh_obs], "sig_rho": [sig_rho_obs], "sig_anom": [sig_anom_obs]})
-
-                list_df_out.append(df_out)
+            sig_dh_obs, sig_rho_obs, sig_anom_obs = propagation_ezw.regional_sigma_wrapper(
+                latitude=np.asarray(lats_tile),
+                longitude=np.asarray(lons_tile),
+                sigma_dh=sigma_dh,
+                sigma_rho=sigma_rho,
+                sigma_anom=sigma_anom,
+                by_year=False,
+                verbose=False
+            )
+            list_df_out.append(pd.DataFrame({
+                "tile_lon": grid_lon,
+                "tile_lat": grid_lat,
+                "year": list_years,
+                "mb": mb,
+                "sig_dh": sig_dh_obs,
+                "sig_rho": sig_rho_obs,
+                "sig_anom": sig_anom_obs
+            }))
 
         # Concatenate all outputs for the region
         df_out_reg = pd.concat(list_df_out)
