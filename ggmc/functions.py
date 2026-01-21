@@ -821,7 +821,10 @@ def calculate_regional_mass_balance(
             df.columns = df.columns.astype(int)
 
         rgi_file = rgi_attribute_dir / f'{rgi_code[region]}_rgi60_{rgi_reg[region]}.csv'
-        rgi_df = pd.read_csv(rgi_file, usecols=['RGIId', 'CenLat', 'CenLon', 'Connect'], index_col='RGIId')
+        rgi_df = pd.read_csv(
+            rgi_file, usecols=['RGIId', 'CenLat', 'CenLon', 'Connect'],
+            index_col='RGIId', encoding='latin1'
+        )
         if region == 'GRL':
             rgi_df = rgi_df[rgi_df['Connect'] != 2]
             l1l2 = rgi_df.index
