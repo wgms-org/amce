@@ -7,7 +7,6 @@ import ggmc.functions
 
 # ---- Constants ----
 
-FOG_VERSION: str = '2025-01'
 INPUT_PATH: Path = Path('data/_input')
 OUTPUT_PATH: Path = Path('data/_output')
 OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
@@ -20,7 +19,7 @@ BEGIN_YEAR: int = 1915
 
 # ---- 1. Glacier change data ----
 
-MASS_BALANCE_FILE: Path = INPUT_PATH / 'fog_bw-bs-ba_2025-01.csv'
+MASS_BALANCE_FILE: Path = INPUT_PATH / 'fog_bw-bs-ba.csv'
 
 ggmc.functions.format_mass_balance_data(
     input_file=MASS_BALANCE_FILE,
@@ -28,11 +27,14 @@ ggmc.functions.format_mass_balance_data(
     output_dir=OUTPUT_PATH,
 )
 
-ELEVATION_CHANGE_FILE: Path = INPUT_PATH / 'FOG_ELEVATION_CHANGE_DATA_2025-01.csv'
-GLACIER_SERIES_FILE: Path = INPUT_PATH / 'FOG_GLACIER_SERIES_2025-01.csv'
+# Input
+ELEVATION_CHANGE_FILE: Path = INPUT_PATH / 'FOG_ELEVATION_CHANGE_DATA.csv'
+GLACIER_SERIES_FILE: Path = INPUT_PATH / 'FOG_GLACIER_SERIES.csv'
 INVESTIGATORS_TO_DROP: List[str] = ['Robert McNabb', 'Thorsten Seehaus']
-GLACIER_COORDINATE_FILE: Path = OUTPUT_PATH / 'FOG_coord_2025-01.csv'
-GEODETIC_CHANGE_FILE: Path = OUTPUT_PATH / '_FOG_GEO_MASS_BALANCE_DATA_2025-01.csv'
+
+# Output
+GLACIER_COORDINATE_FILE: Path = OUTPUT_PATH / 'FOG_coord.csv'
+GEODETIC_CHANGE_FILE: Path = OUTPUT_PATH / '_FOG_GEO_MASS_BALANCE_DATA.csv'
 
 ggmc.functions.format_elevation_change(
     elevation_change_file=ELEVATION_CHANGE_FILE,
@@ -48,16 +50,18 @@ ggmc.functions.format_elevation_change(
 YEAR_INI: int = 2011
 YEAR_FIN: int = 2020
 
-# Input/Output data paths
+# Input
+URUMQI_MISSING_YEARS_FILE: Path = INPUT_PATH / 'urumqi_missing_years.csv'
+
+# Output
 BA_FILE: Path = OUTPUT_PATH / 'ba.csv'
 BA_UNC_FILE: Path = OUTPUT_PATH / 'ba_unc.csv'
-URUMQI_MISSING_YEARS_FILE: Path = INPUT_PATH / 'urumqi_missing_years.csv'
 MEAN_ANOMALY_DIR: Path = OUTPUT_PATH / 'MEAN_spatial_gla_anom'
 LOOKUP_ANOMALY_DIR: Path = OUTPUT_PATH / 'LOOKUP_spatial_and_reg_ids'
 LONG_NORM_ANOMALY_DIR: Path = OUTPUT_PATH / 'LONG-NORM_spatial_gla_anom'
-REGIONS: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'SA1', 'SA2', 'NZL', 'ANT']
+REGIONS: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'NZL', 'ANT', 'SA1', 'SA2']
 
-# TODO: Expose regions as parameter
+# TODO: Expose region configuration as parameter
 ggmc.functions.calculate_global_glacier_spatial_anomaly(
     year_ini=YEAR_INI,
     year_fin=YEAR_FIN,
@@ -77,7 +81,7 @@ ggmc.functions.calculate_global_glacier_spatial_anomaly(
 # ---- 3. Kriging global CE spatial anomaly ----
 
 # TODO: Determine from data
-END_YEAR: int = 2024
+END_YEAR: int = 2025
 REGION_OCE_DIR: Path = OUTPUT_PATH / 'OCE_files_by_region'
 MIN_YEAR_GEO_OBS: int = 0
 
@@ -162,6 +166,11 @@ ggmc.functions.calculate_regional_mass_balance(
     rgi_attribute_dir=RGI_ATTRIBUTE_DIR
 )
 
+ggmc.functions.compile_regional_mass_balance(
+    regional_balance_dir=REGIONAL_BALANCE_DIR,
+    regions=REGIONS
+)
+
 REGIONAL_BALANCE_ESSD_DIR: Path = OUTPUT_PATH / 'regional_balance_essd'
 GLACIER_ID_LUT_FILE: Path = INPUT_PATH / 'GLACIER_ID_LUT_links.csv'
 GLIMS_ATTRIBUTE_AREA_FILE: Path = INPUT_PATH / 'glims_CAU_attributes.csv'
@@ -182,7 +191,7 @@ ggmc.functions.calculate_regional_mass_balance_essd(
 
 # Period to calculate the cumulative mass loss
 INI_YR: int = 1976
-FIN_YR: int = 2024
+FIN_YR: int = 2025
 
 ZEMP_REGIONAL_SERIES_DIR: Path = INPUT_PATH / 'zemp_etal_regional_series'
 REGIONAL_AREA_CHANGE_FILE: Path = INPUT_PATH / 'Regional_area_change_Zemp_for_spt_CEs.csv'
@@ -251,6 +260,7 @@ RGI_CODE: Dict[str, str] = {
     'ANT' : '19'
 }
 
+# TODO: Why is SAN used here instead of SA1 and SA2?
 REGIONS_SAN: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'SAN', 'NZL', 'ANT']
 
 REGIONAL_TILE_DIR: Path = OUTPUT_PATH / 'Tiles_by_region_0.5'
@@ -267,11 +277,9 @@ ggmc.creation.grid_tiles_per_region(
 
 # ---- 2. OCE to tiles 0.5 grid per region ----
 
-YMIN = 1976
-YMAX = 2024
+YMIN: int = 1976
+YMAX: int = 2025
 
-# TODO: Update to new outputs once available
-OCE_DIR: Path = Path('data/input/Creation_workflow/out_data_2025-01_Dussaillant_etal_format')
 OCE_TILE_DIR: Path = OUTPUT_PATH / 'OCE_tiles_by_region_0.5'
 
 ggmc.creation.oce2tiles_05_grid_per_region(
@@ -279,16 +287,14 @@ ggmc.creation.oce2tiles_05_grid_per_region(
     ymin=YMIN,
     ymax=YMAX,
     regional_tile_dir=REGIONAL_TILE_DIR,
-    oce_dir=OCE_DIR,
+    oce_dir=REGIONAL_BALANCE_ESSD_DIR,
     oce_tile_dir=OCE_TILE_DIR
 )
 
 # ---- 3. Meters water equivalent to gigatonnes and area change 0.5 grid per region ----
 
-# RGI_CODE = {'ALA' : '01', 'WNA' : '02', 'ACN' : '03', 'ACS' : '04', 'GRL' : '05', 'ISL' : '06', 'SJM' : '07', 'SCA' : '08', 'RUA' : '09', 'ASN' : '10',
-#            'CEU' : '11', 'CAU' : '12', 'ASC' : '13', 'ASW' : '14', 'ASE' : '15', 'TRP' : '16', 'SA1' : '17', 'SA2' : '17', 'NZL' : '18', 'ANT' : '19'}
-
-AREA_REF_YEAR = {
+# NOTE: Why is the Regional_area_change_Zemp_for_spt_CEs.csv not used here?
+AREA_REF_YEAR: Dict[str, int] = {
     'ACN': 2000,
     'ACS': 2000,
     'ALA': 2009,
@@ -311,7 +317,7 @@ AREA_REF_YEAR = {
     'WNA': 2006
 }
 
-AREA_CHG_RATE = {
+AREA_CHG_RATE: Dict[str, float] = {
     'ACN': -0.07,
     'ACS': -0.08,
     'ALA': -0.48,
@@ -334,70 +340,43 @@ AREA_CHG_RATE = {
     'WNA': -0.54
 }
 
-MASS_BALANCE_MWE_PATH = "./data/input/Creation_workflow/MB_mwe_gridded_0.5_by_region" # path + '\\out_data_fog_'+fog_version+'\\0_Output_Regional_MB_mwe_by_gridpoint_fog_'+fog_version+'\\'
-MASS_BALANCE_SIGMA_PATH = "./data/input/Creation_workflow/MB_sigma_mwe_gridded_0.5_by_region/" # path_mb + 'MB_mwe_gridded_0.5_by_region\\' # Specific mb files
-OUTPUT_DATA_PATH_STRING = "./data/output/Creation_workflow"
+AREA_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'area_change_by_region_0.5'
+MASS_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'mass_change_by_region_0.5'
 
 ggmc.creation.areachange_grid_per_region(
-    RGI_CODE,
-    REGIONS,
-    AREA_REF_YEAR,
-    AREA_CHG_RATE,
-    YMIN,
-    YMAX,
-    REGIONAL_TILE_DIR,
-    MASS_BALANCE_MWE_PATH,
-    MASS_BALANCE_SIGMA_PATH,
-    OUTPUT_DATA_PATH_STRING
+    regions=REGIONS,
+    area_ref_year=AREA_REF_YEAR,
+    area_chg_rate=AREA_CHG_RATE,
+    ymin=YMIN,
+    ymax=YMAX,
+    regional_tile_dir=REGIONAL_TILE_DIR,
+    oce_tile_dir=OCE_TILE_DIR,
+    area_change_grid_dir=AREA_CHANGE_GRID_DIR,
+    mass_change_grid_dir=MASS_CHANGE_GRID_DIR
 )
 
 # ---- Tiles to global grid 0.5 ----
 
-FOG_VERSION = '2025-01'
-YMIN = 1976
-YMAX = 2024
-
-TOTAL_MASS_LOSS_MWE_PATH = "./data/input/Creation_workflow/dM_Gt_gridded_0.5_by_region"
-TOTAL_MASS_LOSS_SIGMA_PATH = "./data/input/Creation_workflow/dM_sigma_Gt_gridded_0.5_by_region.5"
-SPECIFIC_MASS_LOSS_MWE_PATH = "./data/input/Creation_workflow/MB_mwe_gridded_0.5_by_region"
-SPECIFIC_MASS_LOSS_SIGMA_PATH = "./data/input/Creation_workflow/MB_sigma_mwe_gridded_0.5_by_region"
-GRIDDED_AREA_CHANGE_FILES_PATH = "./data/input/Creation_workflow/area_changes_gridded_0.5_by_region"
-OUTPUT_DATA_PATH_STRING = "./data/output/Creation_workflow"
+# Output
+GLOBAL_GRID_DIR: Path = OUTPUT_PATH / 'global_grid_0.5'
 
 ggmc.creation.tiles_to_global_grid(
-    FOG_VERSION,
-    YMIN,
-    YMAX,
-    TOTAL_MASS_LOSS_MWE_PATH,
-    TOTAL_MASS_LOSS_SIGMA_PATH,
-    SPECIFIC_MASS_LOSS_MWE_PATH,
-    SPECIFIC_MASS_LOSS_SIGMA_PATH,
-    GRIDDED_AREA_CHANGE_FILES_PATH,
-    OUTPUT_DATA_PATH_STRING
+    ymin=YMIN,
+    ymax=YMAX,
+    mass_change_grid_dir=MASS_CHANGE_GRID_DIR,
+    oce_tile_dir=OCE_TILE_DIR,
+    area_change_grid_dir=AREA_CHANGE_GRID_DIR,
+    global_grid_dir=GLOBAL_GRID_DIR
 )
 
 # ---- CSV to NetCDF4 global grid 0.5 ----
 
-FOG_VERSION = '2025-01'
-YMIN = 1976
-# !! 2024 was changed to 2023 because the input files did not contain data for year 2024
-YMAX = 2023
-
-TOTAL_MASS_LOSS_MWE_PATH = "./data/input/Creation_workflow/dM_Gt_globalGrid_0.5"
-TOTAL_MASS_LOSS_SIGMA_PATH = "./data/input/Creation_workflow/sigma_dM_Gt_globalGrid_0.5"
-SPECIFIC_MASS_LOSS_MWE_PATH = "./data/input/Creation_workflow/MB_mwe_globalGrid_0.5"
-SPECIFIC_MASS_LOSS_SIGMA_PATH = "./data/input/Creation_workflow/sigma_MB_mwe_globalGrid_0.5"
-GRIDDED_AREA_CHANGE_FILES_PATH = "./data/input/Creation_workflow/Area_km2_globalGrid_0.5"
-OUTPUT_DATA_PATH_STRING = "./data/output/Creation_workflow/NetCDFs"
+# Output
+GLOBAL_GRID_NETCDF_DIR: Path = OUTPUT_PATH / 'global_grid_netcdf_0.5'
 
 ggmc.creation.csv2netcdf4_globalGrid(
-    FOG_VERSION,
-    YMIN,
-    YMAX,
-    TOTAL_MASS_LOSS_MWE_PATH,
-    TOTAL_MASS_LOSS_SIGMA_PATH,
-    SPECIFIC_MASS_LOSS_MWE_PATH,
-    SPECIFIC_MASS_LOSS_SIGMA_PATH,
-    GRIDDED_AREA_CHANGE_FILES_PATH,
-    OUTPUT_DATA_PATH_STRING
+    ymin=YMIN,
+    ymax=YMAX,
+    global_grid_dir=GLOBAL_GRID_DIR,
+    global_grid_netcdf_dir=GLOBAL_GRID_NETCDF_DIR
 )

@@ -7,7 +7,7 @@ import pandas as pd
 import rioxarray  # Register raterio drivers
 import xarray as xr
 
-from ggmc import propagation_ezw
+from ggmc import propagation
 
 
 def grid_tiles_per_region(
@@ -125,18 +125,20 @@ def oce2tiles_05_grid_per_region(
 
         # Loop through all tiles
         for idx_tile in grid_df.index:
+            print(f'{grid_lon}, {grid_lat}')
 
             grid_lat = grid_df["LAT_GRID"].loc[idx_tile]
             grid_lon = grid_df["LON_GRID"].loc[idx_tile]
             grid_area = grid_df["Area"].loc[idx_tile]
-
-            print(f"Working on tile: {grid_lon},{grid_lat}")
 
             # Glaciers that belong in this tile
             idx_within_tile = np.logical_and.reduce((sig_dh_df["CenLat"] >= grid_lat - 0.25,
                                                      sig_dh_df["CenLat"] < grid_lat + 0.25,
                                                      sig_dh_df["CenLon"] >= grid_lon - 0.25,
                                                      sig_dh_df["CenLon"] < grid_lon + 0.25))
+
+            if idx_within_tile.sum() == 0:
+                continue
 
             # Subset to tile
             oce_df_tile = oce_df[idx_within_tile]
@@ -156,7 +158,7 @@ def oce2tiles_05_grid_per_region(
             sigma_rho = sig_rho_df_tile[year_columns].transpose().values * area_weights
             sigma_anom = sig_anom_df_tile[year_columns].transpose().values * area_weights
 
-            sig_dh_obs, sig_rho_obs, sig_anom_obs = propagation_ezw.regional_sigma_wrapper(
+            sig_dh_obs, sig_rho_obs, sig_anom_obs = propagation.regional_sigma_wrapper(
                 latitude=np.asarray(lats_tile),
                 longitude=np.asarray(lons_tile),
                 sigma_dh=sigma_dh,
@@ -207,76 +209,38 @@ def oce2tiles_05_grid_per_region(
 # 1_v1.5_mwe2Gt_AreaChange_0.5_grid_per_region.py
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def areachange_grid_per_region(fog_version: str,
-                               rgi_code: dict,
-                               reg_lst: List[str],
-                               area_ref_year: dict,
-                               area_chg_rate: dict,
-                               ymin: int,
-                               ymax: int,
-                               grid_path: str,
-                               mass_balance_mwe_path: str,
-                               mass_balance_sigma_path: str,
-                               output_data_path_string: str) -> None:
-    """
-    Author: ID
-    Date: 14 June 2021
-    Last changes: 14 June 2021
-
-    Scripted for Python 3.7
-
-    Description:
-    This script reads glacier-wide mass-balance series calculated from OCE and integrates it
-    to a global regular grid of 0.5 degrees lat lon
-
-    Input: OCE_files_by_region
-        _C3S_ELEVATION_CHANGE_SERIES_20200824
-        _C3S_MASS_BALANCE_SERIES_20200824(UTF-8 encoding)
-
-    Return: gridded glacier mb v1
-    """
-
-    path = os.getcwd()
-
-    if Path(grid_path).is_absolute() == True:
-        raise ValueError('grid_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(mass_balance_mwe_path).is_absolute() == True:
-        raise ValueError('mass_balance_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(mass_balance_sigma_path).is_absolute() == True:
-        raise ValueError('mass_balance_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-
-    in_mb_path = mass_balance_mwe_path
-    in_sig_mb_path = mass_balance_sigma_path
-
-    out_dir = Path(output_data_path_string)
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+def areachange_grid_per_region(
+    regions: List[str],
+    area_ref_year: dict,
+    area_chg_rate: dict,
+    ymin: int,
+    ymax: int,
+    regional_tile_dir: Path,
+    oce_tile_dir: Path,
+    area_change_grid_dir: Path,
+    mass_change_grid_dir: Path
+) -> None:
+    area_change_grid_dir.mkdir(parents=True, exist_ok=True)
+    mass_change_grid_dir.mkdir(parents=True, exist_ok=True)
 
     def read_tiles_area_data(region):
         ## Create Regional grid point df: with all glacierized grid points and areas in the region from rgi
         if region == 'SA1':
-            file_grid = Path(grid_path, 'Tiles_0.5_region_' + rgi_code[region] + '_SAN.csv')
+            file_grid = regional_tile_dir / 'SAN.csv'
             grid_df = pd.read_csv(file_grid, sep=',', header=0)
             grid_df= grid_df.loc[(grid_df['LAT_GRID'] < -45.50)].set_index(['LAT_GRID', 'LON_GRID'])
         elif region == 'SA2':
-            file_grid = Path(grid_path, 'Tiles_0.5_region_' + rgi_code[region] + '_SAN.csv')
+            file_grid = regional_tile_dir / 'SAN.csv'
             grid_df = pd.read_csv(file_grid, sep=',', header=0)
             grid_df= grid_df.loc[(grid_df['LAT_GRID'] > -45.50)].set_index(['LAT_GRID', 'LON_GRID'])
         else:
-            file_grid = Path(grid_path, 'Tiles_0.5_region_'+rgi_code[region]+'_'+region+'.csv')
+            file_grid = regional_tile_dir / f'{region}.csv'
             grid_df = pd.read_csv(file_grid, sep=',', header=0, index_col=['LAT_GRID', 'LON_GRID'])
 
-        # !! The original 'Area' column was changed to 'AREA' because it did not match the
-        # !! column names provided in the corresponding input dataset.
         return grid_df, dict(zip(grid_df.index, grid_df['Area']))
 
     def calc_current_area_li(dict_grid, tile, sample_year):
         """Calculate regional tile glacier area for a given year based on linear equation"""
-        print('..............................')
-        print('Calculating regional glacier area for {} based on linear equation.'.format(sample_year))
-
         # find grid point rgi area
         rgi_area = dict_grid[tile]
         change_rate_km2 = area_chg_rate[region] / 100 * rgi_area
@@ -286,110 +250,69 @@ def areachange_grid_per_region(fog_version: str,
 
         return area_sample_year
 
-    """main code"""
-
     yr_lst = list(range(ymin, ymax+1))
 
-    for region in reg_lst:
+    for region in regions:
+        print(region)
 
         ## 1. Calculate tile glacier area for a given year
         grid_df, dict_grid = read_tiles_area_data(region)
         tile_area_lst=[]
 
         for tile in grid_df.index:
-            print('working on tile ', tile)
+            print(tile, end='\r')
             tile_grid_df = grid_df.loc[[tile]]
-
             for year in yr_lst:
                 area_sample_year = calc_current_area_li(dict_grid, tile, year)
                 tile_grid_df[str(year)]= area_sample_year
-
             tile_area_lst.append(tile_grid_df)
+        print('')
 
         # Save area change file (by tile and year)
         area_chg_grid_df = pd.concat(tile_area_lst).drop(columns='Area')
-
-        out_area_dir = Path(out_dir, 'area_changes_gridded_0.5_by_region')
-        if not os.path.exists(out_area_dir):
-            os.mkdir(out_area_dir)
-        area_chg_grid_df.to_csv(Path(out_area_dir, 'area_change_grid_0.5_reg_' + rgi_code[region] + '_' + region + '.csv'))
+        area_chg_grid_df.to_csv(area_change_grid_dir / f'{region}.csv')
 
         ## 2. Calculate tile glacier Total mass loss in Gt for a given year
 
         # Read specific mass balance file (by tile and year)
-        file_mb_mwe = Path(in_mb_path, 'MB_mwe_grid_0.5_region_' + rgi_code[region] + '_' + region + '.csv')
+        file_mb_mwe = oce_tile_dir / f'{region}_MB_mwe_grid_0.5.csv'
         mb_grid_df = pd.read_csv(file_mb_mwe, sep=',', header=0, index_col= ['LAT_GRID', 'LON_GRID'])
 
         # multiply by area change to get total mass loss in Gt
         dM_Gt_grid_df = (mb_grid_df/ 10**3) * area_chg_grid_df
-
-        out_dM_dir = Path(out_dir, 'dM_Gt_gridded_0.5_by_region')
-        if not os.path.exists(out_dM_dir):
-            os.mkdir(out_dM_dir)
-        dM_Gt_grid_df.to_csv(Path(out_dM_dir, 'dM_Gt_grid_0.5_region_' + rgi_code[region] + '_' + region + '.csv'))
+        dM_Gt_grid_df.to_csv(mass_change_grid_dir / f'{region}_mean.csv')
 
         ## 3. Calculate tile glacier Total mass loss uncertainties in Gt for a given year
-        file_sig_mb_mwe = in_sig_mb_path + 'sigma_TOTAL_grid_0.5_region_' + rgi_code[region] + '_' + region + '.csv'
+        file_sig_mb_mwe = oce_tile_dir / f'{region}_sigma_TOTAL_grid_0.5.csv'
         sig_mb_grid_df = pd.read_csv(file_sig_mb_mwe, sep=',', header=0, index_col= ['LAT_GRID', 'LON_GRID'])
-
-        dM_sig_Gt_grid_df = abs(dM_Gt_grid_df) * np.sqrt( (sig_mb_grid_df/mb_grid_df)**2 + (0.05)**2  )
-
-        out_sig_dM_dir = Path(out_dir, 'dM_sigma_Gt_gridded_0.5_by_region')
-        if not os.path.exists(out_sig_dM_dir):
-            os.mkdir(out_sig_dM_dir)
-        dM_sig_Gt_grid_df.to_csv(Path(out_sig_dM_dir, 'dM_sigma_Gt_grid_0.5_region_' + rgi_code[region] + '_' + region + '.csv'))
+        dM_sig_Gt_grid_df = abs(dM_Gt_grid_df) * np.sqrt( (sig_mb_grid_df/mb_grid_df)**2 + (0.05)**2 )
+        dM_sig_Gt_grid_df.to_csv(mass_change_grid_dir / f'{region}_sigma.csv')
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 2_v1.5_tiles2globalGridd.py
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def tiles_to_global_grid(fog_version: str,
-                         ymin: int,
-                         ymax: int,
-                         total_mass_loss_mwe_path: str,
-                         total_mass_loss_sigma_path: str,
-                         specific_mass_loss_mwe_path: str,
-                         specific_mass_loss_sigma_path: str,
-                         gridded_area_change_files_path: str,
-                         output_data_path_string: str) -> None:
-    """
-    There was no included documentation with this function
-    """
-
-    path = os.getcwd()
-
-    if Path(total_mass_loss_mwe_path).is_absolute() == True:
-        raise ValueError('total_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(total_mass_loss_sigma_path).is_absolute() == True:
-        raise ValueError('total_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(specific_mass_loss_mwe_path).is_absolute() == True:
-        raise ValueError('specific_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(specific_mass_loss_sigma_path).is_absolute() == True:
-        raise ValueError('specific_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(gridded_area_change_files_path).is_absolute() == True:
-        raise ValueError('gridded_area_change_files_path must be provided as a relative path from the working directory of your workflow script.')
+def tiles_to_global_grid(
+    ymin: int,
+    ymax: int,
+    mass_change_grid_dir: Path,
+    oce_tile_dir: Path,
+    area_change_grid_dir: Path,
+    global_grid_dir: Path
+) -> None:
+    global_grid_dir.mkdir(parents=True, exist_ok=True)
 
     # gridded Total mass loss files
-    filenames_dM_Gt = Path(total_mass_loss_mwe_path).glob('*.csv')
-    filenames_sig_dM = Path(total_mass_loss_sigma_path).glob('*.csv')
+    filenames_dM_Gt = mass_change_grid_dir.glob('*_mean.csv')
+    filenames_sig_dM = mass_change_grid_dir.glob('*_sigma.csv')
 
     # gridded Specific mass balance files
-    filenames_mb_mwe = Path(specific_mass_loss_mwe_path).glob('*.csv')
-    filenames_sig_mb = Path(specific_mass_loss_sigma_path).glob('*.csv')
+    filenames_mb_mwe = oce_tile_dir.glob('*_MB_mwe_grid_0.5.csv')
+    filenames_sig_mb = oce_tile_dir.glob('*_sigma_TOTAL_grid_0.5.csv')
 
     # gridded area change files
-    filenames_area= Path(gridded_area_change_files_path).glob('*.csv')
-
-    if Path(output_data_path_string).is_absolute() == True:
-        raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
-    out_dir = Path(output_data_path_string)
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+    filenames_area= area_change_grid_dir.glob('*.csv')
 
     #Create an empty dataframe with gridded 0.5 x 0.5 degrees
     lat_lst= np.arange(-89.75, 89.751, 0.5).tolist()
@@ -407,154 +330,90 @@ def tiles_to_global_grid(fog_version: str,
     yr_lst = np.arange(ymin, ymax+1).tolist()
 
     for year in yr_lst:
-        print('Working on year', year)
+        print(year)
 
         # Create Total mass loss Global grid
         for file in filenames_dM_Gt:
             dM_df = pd.read_csv(file, sep=',', header=0)
 
-            for index,row in dM_df.iterrows():
+            for _, row in dM_df.iterrows():
                 lat = row['LAT_GRID']
                 lon = row['LON_GRID']
-                # print(lat,',', lon)
                 dM = row[str(year)]
-                # print(mb)
                 lat_lon_dM_df.loc[lat, lon] = dM
 
-        out_dM_dir = Path(out_dir, 'dM_Gt_globalGrid_0.5')
-        if not os.path.exists(out_dM_dir):
-            os.mkdir(out_dM_dir)
-
-        lat_lon_dM_df.to_csv(Path(out_dM_dir, 'dM_Gt_globalGrid_0.5_' + str(year) + '.csv'))
+        lat_lon_dM_df.to_csv(global_grid_dir / f'mass_change_{year}_mean.csv')
 
         # Create Total mass loss uncertainty Global grid
         for file in filenames_sig_dM:
-            sig_dM_df = pd.read_csv(file, sep=',', header=0)
+            sig_dM_df = pd.read_csv(file)
 
-            for index,row in sig_dM_df.iterrows():
+            for _, row in sig_dM_df.iterrows():
                 lat = row['LAT_GRID']
                 lon = row['LON_GRID']
-                # print(lat,',', lon)
                 sig_dM = row[str(year)]
-                # print(mb)
                 lat_lon_sig_dM_df.loc[lat, lon] = sig_dM
 
-        out_sig_dM_dir = Path(out_dir, 'sigma_dM_Gt_globalGrid_0.5')
-        if not os.path.exists(out_sig_dM_dir):
-            os.mkdir(out_sig_dM_dir)
-
-        lat_lon_sig_dM_df.to_csv(Path(out_sig_dM_dir, 'sigma_dM_Gt_globalGrid_0.5_' + str(year) + '.csv'))
+        lat_lon_sig_dM_df.to_csv(global_grid_dir / f'mass_change_{year}_sigma.csv')
 
         # Create Specific mass balance Global grid
         for file in filenames_mb_mwe:
-            mb_df = pd.read_csv(file, sep=',', header=0)
+            mb_df = pd.read_csv(file)
 
-            for index,row in mb_df.iterrows():
+            for _, row in mb_df.iterrows():
                 lat = row['LAT_GRID']
                 lon = row['LON_GRID']
-                # print(lat,',', lon)
                 mb = row[str(year)]
-                # print(mb)
                 lat_lon_MB_df.loc[lat, lon] = round(mb, 3)
 
-        out_mb_dir = Path(out_dir, 'MB_mwe_globalGrid_0.5')
-        if not os.path.exists(out_mb_dir):
-            os.mkdir(out_mb_dir)
-
-        lat_lon_MB_df.to_csv(Path(out_mb_dir, 'MB_mwe_globalGrid_0.5_' + str(year) + '.csv'))
+        lat_lon_MB_df.to_csv(global_grid_dir / f'mass_balance_{year}_mean.csv')
 
         # Create Specific mass balance uncertainty Global grid
         for file in filenames_sig_mb:
-            sig_mb_df = pd.read_csv(file, sep=',', header=0)
+            sig_mb_df = pd.read_csv(file)
 
-            for index,row in sig_mb_df.iterrows():
+            for _, row in sig_mb_df.iterrows():
                 lat = row['LAT_GRID']
                 lon = row['LON_GRID']
-                # print(lat,',', lon)
                 sig_mb = row[str(year)]
-                # print(mb)
                 lat_lon_sig_MB_df.loc[lat, lon] = round(sig_mb, 3)
 
-        out_mb_sig_dir = Path(out_dir, 'sigma_MB_mwe_globalGrid_0.5')
-        if not os.path.exists(out_mb_sig_dir):
-            os.mkdir(out_mb_sig_dir)
-
-        lat_lon_sig_MB_df.to_csv(Path(out_mb_sig_dir, 'sigma_MB_mwe_globalGrid_0.5_' + str(year) + '.csv'))
+        lat_lon_sig_MB_df.to_csv(global_grid_dir / f'mass_balance_{year}_sigma.csv')
 
         # Create Area change Global grid
         for file in filenames_area:
-            area_df= pd.read_csv(file, sep=',', header=0)
+            area_df= pd.read_csv(file)
 
-            for index,row in area_df.iterrows():
+            for _, row in area_df.iterrows():
                 lat = row['LAT_GRID']
                 lon = row['LON_GRID']
-                # print(lat,',', lon)
                 area = row[str(year)]
-                # print(area)
                 lat_lon_area_df.loc[lat, lon] = round(area,3)
 
-        out_area_dir = Path(out_dir, 'Area_km2_globalGrid_0.5')
-        if not os.path.exists(out_area_dir):
-            os.mkdir(out_area_dir)
-
-        lat_lon_area_df.to_csv(Path(out_area_dir, 'Area_km2_globalGrid_0.5_' + str(year) + '.csv'))
-
+        lat_lon_area_df.to_csv(global_grid_dir / f'area_change_{year}.csv')
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # 3_v1.5_csv2netcdf4_globalGrid_0.5.py
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def csv2netcdf4_globalGrid(fog_version: str,
-                           ymin: int,
-                           ymax: int,
-                           total_mass_loss_mwe_path: str,
-                           total_mass_loss_sigma_path: str,
-                           specific_mass_loss_mwe_path: str,
-                           specific_mass_loss_sigma_path: str,
-                           gridded_area_change_files_path: str,
-                           output_data_path_string: str) -> None:
-    """
-    There was no included documentation with this function
-    """
+def csv2netcdf4_globalGrid(
+    ymin: int,
+    ymax: int,
+    global_grid_dir: Path,
+    global_grid_netcdf_dir: Path
+) -> None:
+    global_grid_netcdf_dir.mkdir(parents=True, exist_ok=True)
+    years = np.arange(ymin, ymax + 1).tolist()
 
-    path = os.getcwd()
+    for year in years:
+        print(year)
 
-    if Path(total_mass_loss_mwe_path).is_absolute() == True:
-        raise ValueError('total_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
+        file_gla_gt = global_grid_dir / f'mass_change_{year}_mean.csv'
+        file_sig_gt = global_grid_dir / f'mass_change_{year}_sigma.csv'
 
-    if Path(total_mass_loss_sigma_path).is_absolute() == True:
-        raise ValueError('total_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(specific_mass_loss_mwe_path).is_absolute() == True:
-        raise ValueError('specific_mass_loss_mwe_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(specific_mass_loss_sigma_path).is_absolute() == True:
-        raise ValueError('specific_mass_loss_sigma_path must be provided as a relative path from the working directory of your workflow script.')
-
-    if Path(gridded_area_change_files_path).is_absolute() == True:
-        raise ValueError('gridded_area_change_files_path must be provided as a relative path from the working directory of your workflow script.')
-
-    yr_lst = np.arange(ymin, ymax+1).tolist()
-
-    if Path(output_data_path_string).is_absolute() == True:
-        raise ValueError('output_data_path_string must be provided as a relative path from the working directory of your workflow script.')
-    out_dir = Path(output_data_path_string)
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
-
-    # Define the compression settings
-    comp = dict(zlib=True, complevel=5)
-
-    for year in yr_lst:
-        print('working on year: ', year)
-
-        file_gla_gt = Path(total_mass_loss_mwe_path, 'dM_Gt_globalGrid_0.5_' + str(year) + '.csv')
-        file_sig_gt = Path(total_mass_loss_sigma_path, 'sigma_dM_Gt_globalGrid_0.5_' + str(year) + '.csv')
-
-        file_gla_mwe = Path(specific_mass_loss_mwe_path, 'MB_mwe_globalGrid_0.5_' + str(year) + '.csv')
-        file_sig_mwe = Path(specific_mass_loss_sigma_path, 'sigma_MB_mwe_globalGrid_0.5_' + str(year) + '.csv')
-
-        file_gla_area = Path(gridded_area_change_files_path, 'Area_km2_globalGrid_0.5_' + str(year) + '.csv')
+        file_gla_mwe = global_grid_dir / f'mass_balance_{year}_mean.csv'
+        file_sig_mwe = global_grid_dir / f'mass_balance_{year}_sigma.csv'
+        file_gla_area = global_grid_dir / f'area_change_{year}.csv'
 
         # Read glacier mass change data as dataframe
         gla_gt_df = pd.read_csv(file_gla_gt, index_col=0)
@@ -569,7 +428,6 @@ def csv2netcdf4_globalGrid(fog_version: str,
         lat = gla_gt_df.index
 
         time = pd.date_range(start=str(year), periods=12, freq='MS')
-        print(pd.date_range(start=str(year), periods=12, freq='MS'))
 
         # Read glacier mass change data as xarray with lat, lon, time dimensions
         Glacier_newformat = xr.DataArray(data=gla_gt_df, dims=['lat', 'lon'], coords={'lat': lat, 'lon': lon})
@@ -659,21 +517,16 @@ def csv2netcdf4_globalGrid(fog_version: str,
         Glacier_newformat.attrs['references'] = 'Fluctuation of Glaciers (FoG) database version wgms-fog-2025-01'
         Glacier_newformat.attrs['citation'] = 'Dussaillant et al. 2025'
         Glacier_newformat.attrs['conventions'] = 'CF Version CF-1.8'
-        Glacier_newformat.attrs['dataset_description'] = 'Horizontal resolution: 0.5° (latitude - longitude), GCS_WGS_1984' \
-                                             'Temporal resolution: Annual, hydrological year' \
-                                             'Temporal coverage: hydrological years from 1976 to 2024' \
-                                             'Observational sample: 96% of world glaciers with valid observations'\
-                                             'Spatial interpolation method: Kriging'\
-
-
+        Glacier_newformat.attrs['dataset_description'] = (
+            'Horizontal resolution: 0.5° (latitude - longitude), GCS_WGS_1984' \
+            'Temporal resolution: Annual, hydrological year' \
+            'Temporal coverage: hydrological years from 1976 to 2024' \
+            'Observational sample: 96% of world glaciers with valid observations'\
+            'Spatial interpolation method: Kriging'\
+        )
 
         crs = 'EPSG:4326'  # WGS84
         Glacier_newformat = Glacier_newformat.rio.write_crs(crs, inplace=True)
 
-        # write yearly NetCDF files
-        out_dir_year = Path(out_dir, 'ggagmc_fog-'+fog_version+'_review_ESSD')
-        if not os.path.exists(out_dir_year):
-            os.mkdir(out_dir_year)
-
         Glacier_newformat = Glacier_newformat.sel(time=str(year) + '-01')
-        Glacier_newformat.to_netcdf(Path(out_dir_year,'global-gridded-annual-glacier-mass-change-' + str(year) + '.nc'), unlimited_dims='time')
+        Glacier_newformat.to_netcdf(global_grid_netcdf_dir / f'{year}.nc', unlimited_dims='time')

@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from ggmc import helpers, kriging, propagation_ezw
+from ggmc import helpers, kriging, propagation
 
 
 def format_mass_balance_data(
@@ -912,7 +912,7 @@ def calculate_regional_mass_balance(
 
         Reg_mb_df[region] = Aw_oce_obs
 
-        list_sig_dh_yearly, list_sig_rho_yearly, list_sig_anom_yearly = propagation_ezw.regional_sigma_wrapper(
+        list_sig_dh_yearly, list_sig_rho_yearly, list_sig_anom_yearly = propagation.regional_sigma_wrapper(
             latitude=np.asarray(list_lat),
             longitude=np.asarray(list_lon),
             sigma_dh=rel_sig_dh_mb_df.values,
@@ -949,15 +949,11 @@ def calculate_regional_mass_balance(
             'sigma_anom m w.e.': Aw_sig_anom_obs / 1000
         }).to_csv(regional_balance_dir / f'{region}_B_and_sigma.csv')
 
-    Reg_mb_df = Reg_mb_df[Reg_mb_df.index >= begin_year] / 1000
-    Reg_sig_mb_df = Reg_sig_mb_df[Reg_sig_mb_df.index >= begin_year] / 1000
-    # Save regional Mass balance series
-    Reg_mb_df.to_csv(regional_balance_dir / 'Regional_B_series_AreaWeighted_code.csv')
-    Reg_sig_mb_df.to_csv(regional_balance_dir / 'Regional_B_series_uncertainty_code.csv')
 
-    # Compile files into single csvs
-    # !! Moved from start of function, before the necessary files exist
-    # TODO: Unclear why this is necessary.
+def compile_regional_mass_balance(
+    regional_balance_dir: Path,
+    regions: List[str]
+) -> None:
     reg_mb_lst = []
     reg_sig_mb_lst = []
 
@@ -973,8 +969,6 @@ def calculate_regional_mass_balance(
 
     reg_mb_df = pd.concat(reg_mb_lst, axis=1)
     reg_sig_mb_df = pd.concat(reg_sig_mb_lst, axis=1)
-
-    ### Save regional Mass balance series
     reg_mb_df.to_csv(regional_balance_dir / 'Regional_B_series_AreaWeighted.csv')
     reg_sig_mb_df.to_csv(regional_balance_dir / 'Regional_B_series_uncertainty.csv')
 
@@ -995,7 +989,6 @@ def calculate_regional_mass_balance_essd(
     id_link_df = pd.read_csv(glacier_id_lut_file)
     id_glims_coords_df = pd.read_csv(glims_attribute_file, usecols= ['glac_id', 'CenLat', 'CenLon', 'Area'])
     id_glims_coords_df.rename(columns={'glac_id': 'GLIMS_ID'}, inplace=True)
-    id_glims_coords_df.set_index('GLIMS_ID', inplace=True)
 
     ###### Calculate specific glacier mass balance by region ######
 
@@ -1095,7 +1088,6 @@ def calculate_regional_mass_balance_essd(
             rgi_df.insert(0, 'REGION', first_column)
 
         rgi_df.reset_index(inplace=True)
-        id_glims_coords_df.reset_index(inplace=True)
 
         if 'cal_series' in runs:
             if region == 'CAU':
@@ -1251,10 +1243,23 @@ def calculate_regional_mass_loss(
 
     ###### Calculate total glacier mass loss by region ######
 
-    cols = ['region', 'area_mean_' + str(ini_yr_full_obs) +'-' + str(fin_yr_obs) + ' [km2]', 'area_mean_' + str(min(PoR)) + '_' + str(max(PoR)) + ' [km2]',
-            'percentage_area_obs' ,'DM [Gt yr-1]', 'sigma_DM [Gt yr-1]', 'CUM_DM_'+str(min(PoR))+'_'+str(max(PoR))+' [Gt]', 'sigma_CUM_DM_' + str(min(PoR)) + '_' + str(max(PoR)) + ' [Gt]',
-            'B [mwe yr-1]', 'sigma_B [mwe yr-1]',  'SLE [mm yr-1]', 'sigma_SLE [mm yr-1]', 'zemp_DM [Gt yr-1]', 'zemp_sigma_DM [Gt yr-1]',
-            'zemp_CUM_DM_'+str(min(PoR))+'_'+str(max(PoR))+' [Gt]']
+    cols = [
+        'region',
+        f'area_mean_{ini_yr_full_obs}-{fin_yr_obs} [km2]',
+        f'area_mean_{min(PoR)}_{max(PoR)} [km2]',
+        'percentage_area_obs',
+        'DM [Gt yr-1]',
+        'sigma_DM [Gt yr-1]',
+        f'CUM_DM_{min(PoR)}_{max(PoR)} [Gt]',
+        f'sigma_CUM_DM_{min(PoR)}_{max(PoR)} [Gt]',
+        'B [mwe yr-1]',
+        'sigma_B [mwe yr-1]',
+        'SLE [mm yr-1]',
+        'sigma_SLE [mm yr-1]',
+        'zemp_DM [Gt yr-1]',
+        'zemp_sigma_DM [Gt yr-1]',
+        f'zemp_CUM_DM_{min(PoR)}_{max(PoR)} [Gt]'
+    ]
 
 
     glob_cum_df = pd.DataFrame(index=regions, columns=cols)
@@ -1283,7 +1288,6 @@ def calculate_regional_mass_loss(
         ## select wgms_ids belonging to the region group
         wgms_id_lst = oce_df.columns.to_list()
         wgms_id_lst = [int(i) for i in wgms_id_lst]
-        print(len(wgms_id_lst))
 
         id_lst=[]
         for id in wgms_id_lst:
@@ -1294,7 +1298,6 @@ def calculate_regional_mass_loss(
         ## Calculate total area of observed glaciers presenting an area value in FoG
 
         nb_gla_reg = len(rgi_area_df)
-        print(nb_gla_reg)
         gla_obs_df = rgi_area_df.loc[id_lst]
 
         tot_area_rgi_reg = rgi_area_df['AREA'].sum()
