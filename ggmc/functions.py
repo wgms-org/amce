@@ -767,7 +767,6 @@ def calculate_regional_mass_balance(
     regions: List[str],
     rgi_reg: dict,
     rgi_code: dict,
-    begin_year: int,
     rgi_area_file: Path,
     glims_attribute_file: Path,
     rgi_attribute_dir: Path

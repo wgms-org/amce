@@ -165,7 +165,6 @@ ggmc.functions.calculate_regional_mass_balance(
     regions=REGIONS,
     rgi_reg=RGI_REG,
     rgi_code=RGI_CODE,
-    begin_year=BEGIN_YEAR,
     rgi_area_file=RGI_AREA_FILE,
     glims_attribute_file=GLIMS_ATTRIBUTE_FILE,
     rgi_attribute_dir=RGI_ATTRIBUTE_DIR
