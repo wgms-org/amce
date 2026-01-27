@@ -7,8 +7,8 @@ import ggmc.functions
 
 # ---- Constants ----
 
-INPUT_PATH: Path = Path('data/_input')
-OUTPUT_PATH: Path = Path('data/_output')
+INPUT_PATH: Path = Path('data/input')
+OUTPUT_PATH: Path = Path('data/output')
 OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 DENSITY_FACTOR: Tuple[float, float] = (0.85, 0.06)
@@ -49,6 +49,7 @@ ggmc.functions.format_elevation_change(
 
 YEAR_INI: int = 2011
 YEAR_FIN: int = 2020
+REGIONS: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'NZL', 'ANT', 'SA1', 'SA2']
 
 # Input
 URUMQI_MISSING_YEARS_FILE: Path = INPUT_PATH / 'urumqi_missing_years.csv'
@@ -59,7 +60,6 @@ BA_UNC_FILE: Path = OUTPUT_PATH / 'ba_unc.csv'
 MEAN_ANOMALY_DIR: Path = OUTPUT_PATH / 'MEAN_spatial_gla_anom'
 LOOKUP_ANOMALY_DIR: Path = OUTPUT_PATH / 'LOOKUP_spatial_and_reg_ids'
 LONG_NORM_ANOMALY_DIR: Path = OUTPUT_PATH / 'LONG-NORM_spatial_gla_anom'
-REGIONS: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'NZL', 'ANT', 'SA1', 'SA2']
 
 # TODO: Expose region configuration as parameter
 ggmc.functions.calculate_global_glacier_spatial_anomaly(
@@ -82,11 +82,13 @@ ggmc.functions.calculate_global_glacier_spatial_anomaly(
 
 # TODO: Determine from data
 END_YEAR: int = 2025
-REGION_OCE_DIR: Path = OUTPUT_PATH / 'OCE_files_by_region'
 MIN_YEAR_GEO_OBS: int = 0
 
 # NOTE: Hugonnet 5-year estimates are only dropped if min_length_geo >= 5
 MIN_LENGTH_GEO: float = 5.0
+
+# Output
+REGION_OCE_DIR: Path = OUTPUT_PATH / 'OCE_files_by_region'
 
 ggmc.functions.calculate_consensus_estimate_and_error_global_glacier_regional_anomaly(
     begin_year=BEGIN_YEAR,
@@ -149,9 +151,12 @@ RGI_CODE: Dict[str, str] = {
   'ANT' : '19'
 }
 
+# Input
 RGI_AREA_FILE: Path = INPUT_PATH / '_RGI_All_ID_Area.csv'
 GLIMS_ATTRIBUTE_FILE: Path = INPUT_PATH / 'CAU_glims_attribute_table.csv'
 RGI_ATTRIBUTE_DIR: Path = INPUT_PATH / '00_rgi60/00_rgi60_attribs'
+
+# Output
 REGIONAL_BALANCE_DIR: Path = OUTPUT_PATH / 'regional_balance'
 
 ggmc.functions.calculate_regional_mass_balance(
@@ -171,9 +176,12 @@ ggmc.functions.compile_regional_mass_balance(
     regions=REGIONS
 )
 
-REGIONAL_BALANCE_ESSD_DIR: Path = OUTPUT_PATH / 'regional_balance_essd'
+# Input
 GLACIER_ID_LUT_FILE: Path = INPUT_PATH / 'GLACIER_ID_LUT_links.csv'
 GLIMS_ATTRIBUTE_AREA_FILE: Path = INPUT_PATH / 'glims_CAU_attributes.csv'
+
+# Output
+REGIONAL_BALANCE_ESSD_DIR: Path = OUTPUT_PATH / 'regional_balance_essd'
 
 ggmc.functions.calculate_regional_mass_balance_essd(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
@@ -193,8 +201,11 @@ ggmc.functions.calculate_regional_mass_balance_essd(
 INI_YR: int = 1976
 FIN_YR: int = 2025
 
+# Input
 ZEMP_REGIONAL_SERIES_DIR: Path = INPUT_PATH / 'zemp_etal_regional_series'
 REGIONAL_AREA_CHANGE_FILE: Path = INPUT_PATH / 'Regional_area_change_Zemp_for_spt_CEs.csv'
+
+# Output
 MASS_LOSS_DIR: Path = OUTPUT_PATH / 'mass_loss'
 
 ggmc.functions.calculate_regional_mass_loss(
@@ -263,6 +274,7 @@ RGI_CODE: Dict[str, str] = {
 # TODO: Why is SAN used here instead of SA1 and SA2?
 REGIONS_SAN: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA', 'RUA', 'ASN', 'CEU', 'CAU', 'ASC', 'ASW', 'ASE', 'TRP', 'SAN', 'NZL', 'ANT']
 
+# Output
 REGIONAL_TILE_DIR: Path = OUTPUT_PATH / 'Tiles_by_region_0.5'
 
 ggmc.creation.grid_tiles_per_region(
@@ -280,6 +292,7 @@ ggmc.creation.grid_tiles_per_region(
 YMIN: int = 1976
 YMAX: int = 2025
 
+# Output
 OCE_TILE_DIR: Path = OUTPUT_PATH / 'OCE_tiles_by_region_0.5'
 
 ggmc.creation.oce2tiles_05_grid_per_region(
@@ -340,6 +353,7 @@ AREA_CHG_RATE: Dict[str, float] = {
     'WNA': -0.54
 }
 
+# Output
 AREA_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'area_change_by_region_0.5'
 MASS_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'mass_change_by_region_0.5'
 
