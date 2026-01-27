@@ -303,37 +303,37 @@ def tiles_to_global_grid(
     global_grid_dir.mkdir(parents=True, exist_ok=True)
 
     # gridded Total mass loss files
-    filenames_dM_Gt = mass_change_grid_dir.glob('*_mean.csv')
-    filenames_sig_dM = mass_change_grid_dir.glob('*_sigma.csv')
+    filenames_dM_Gt = sorted(mass_change_grid_dir.glob('*_mean.csv'))
+    filenames_sig_dM = sorted(mass_change_grid_dir.glob('*_sigma.csv'))
 
     # gridded Specific mass balance files
-    filenames_mb_mwe = oce_tile_dir.glob('*_MB_mwe_grid_0.5.csv')
-    filenames_sig_mb = oce_tile_dir.glob('*_sigma_TOTAL_grid_0.5.csv')
+    filenames_mb_mwe = sorted(oce_tile_dir.glob('*_MB_mwe_grid_0.5.csv'))
+    filenames_sig_mb = sorted(oce_tile_dir.glob('*_sigma_TOTAL_grid_0.5.csv'))
 
     # gridded area change files
-    filenames_area= area_change_grid_dir.glob('*.csv')
+    filenames_area = sorted(area_change_grid_dir.glob('*.csv'))
 
-    #Create an empty dataframe with gridded 0.5 x 0.5 degrees
-    lat_lst= np.arange(-89.75, 89.751, 0.5).tolist()
-    lat_lst=lat_lst[::-1]
-    lon_lst= np.arange(-179.75, 179.751, 0.5).tolist()
-    lat_lon_df=pd.DataFrame(columns=lon_lst, index=lat_lst)
+    # Create an empty dataframe with gridded 0.5 x 0.5 degrees
+    lat_lst = np.arange(-89.75, 89.751, 0.5).tolist()
+    lat_lst = lat_lst[::-1]
+    lon_lst = np.arange(-179.75, 179.751, 0.5).tolist()
+    lat_lon_df = pd.DataFrame(columns=lon_lst, index=lat_lst)
 
-    ##Fill dataframe with Area values
-    lat_lon_area_df=lat_lon_df
-    lat_lon_dM_df=lat_lon_df
-    lat_lon_sig_dM_df = lat_lon_df
-    lat_lon_MB_df=lat_lon_df
-    lat_lon_sig_MB_df = lat_lon_df
+    years = np.arange(ymin, ymax+1).tolist()
 
-    yr_lst = np.arange(ymin, ymax+1).tolist()
-
-    for year in yr_lst:
+    for year in years:
         print(year)
+
+        # Prepare dataframes
+        lat_lon_dM_df = lat_lon_df.copy()
+        lat_lon_sig_dM_df = lat_lon_df.copy()
+        lat_lon_MB_df = lat_lon_df.copy()
+        lat_lon_sig_MB_df = lat_lon_df.copy()
+        lat_lon_area_df = lat_lon_df.copy()
 
         # Create Total mass loss Global grid
         for file in filenames_dM_Gt:
-            dM_df = pd.read_csv(file, sep=',', header=0)
+            dM_df = pd.read_csv(file)
 
             for _, row in dM_df.iterrows():
                 lat = row['LAT_GRID']
@@ -402,6 +402,10 @@ def csv2netcdf4_globalGrid(
     global_grid_netcdf_dir: Path
 ) -> None:
     global_grid_netcdf_dir.mkdir(parents=True, exist_ok=True)
+    # Clear existing files in output to avoid xarray write errors
+    for existing_file in global_grid_netcdf_dir.glob('*.nc'):
+        existing_file.unlink()
+
     years = np.arange(ymin, ymax + 1).tolist()
 
     for year in years:
@@ -528,4 +532,4 @@ def csv2netcdf4_globalGrid(
         Glacier_newformat = Glacier_newformat.rio.write_crs(crs, inplace=True)
 
         Glacier_newformat = Glacier_newformat.sel(time=str(year) + '-01')
-        Glacier_newformat.to_netcdf(global_grid_netcdf_dir / f'{year}.nc', unlimited_dims='time')
+        Glacier_newformat.to_netcdf(global_grid_netcdf_dir / f'{year}.nc', unlimited_dims='time', mode='w')
