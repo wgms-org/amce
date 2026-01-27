@@ -338,7 +338,7 @@ def regional_sigma_wrapper(
         # TODO: Use float32 to reduce memory
         correlation = correlation_func(distances)
         all_equal = (sigma == sigma[0]).all()
-        if not all_equal and verbose:
+        if not all_equal and name in ('dh', 'rho') and verbose:
             print(f'[WARNING] sigma_{name} not equal for all years')
         if all_equal:
             result = regional_func(
