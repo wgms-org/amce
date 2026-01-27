@@ -131,6 +131,29 @@ def format_elevation_change(
     ]].to_csv(geodetic_change_file, index=True)
 
 
+def format_regional_area(
+    regional_area_change_rate_file: Path,
+    begin_year: int,
+    end_year: int,
+    regional_area_file: Path
+) -> None:
+    df = pd.read_csv(regional_area_change_rate_file)
+    # List all output years
+    years = np.arange(begin_year, end_year + 1)
+    results = {}
+    results['YEAR'] = years
+    for row in df.to_dict(orient='records'):
+        # Linear rate relative to reference year
+        factor = 1 + (row['change_rate_percentyear'] / 100)
+        nyears = years - row['reference_year']
+        areas = row['reference_area_km2'] * factor ** nyears
+        # Stop area loss before begin year
+        if begin_year < row['begin_year']:
+            areas[years < row['begin_year']] = areas[years == row['begin_year']][0]
+        results[row['region_id']] = np.round(areas, 2)
+    pd.DataFrame(results).to_csv(regional_area_file, index=False)
+
+
 def calculate_global_glacier_spatial_anomaly(
     year_ini: int,
     year_fin: int,
@@ -1198,7 +1221,7 @@ def calculate_regional_mass_balance_essd(
 def calculate_regional_mass_loss(
     regional_balance_dir: Path,
     region_oce_dir: Path,
-    regional_area_change_file: Path,
+    regional_area_file: Path,
     rgi_area_file: Path,
     zemp_regional_series_dir: Path,
     ini_yr: int,
@@ -1235,7 +1258,7 @@ def calculate_regional_mass_loss(
     ba_df = pd.read_csv(area_weighted_file, index_col='YEAR')
     sig_ba_df = pd.read_csv(uncertainty_file, index_col='YEAR')
 
-    reg_area_zemp_df = pd.read_csv(regional_area_change_file, index_col='YEAR')
+    reg_area_zemp_df = pd.read_csv(regional_area_file, index_col='YEAR')
     id_area_df = pd.read_csv(rgi_area_file)
 
     ############################################################################################################################

@@ -1,6 +1,8 @@
 from typing import Dict, List, Tuple
 from pathlib import Path
 
+import pandas as pd
+
 import ggmc.creation
 import ggmc.functions
 
@@ -16,6 +18,9 @@ DENSITY_FACTOR: Tuple[float, float] = (0.85, 0.06)
 
 BEGIN_YEAR: int = 1915
 """Earliest year (determined by longer anomally from CEU starting in 1915)."""
+
+# TODO: Determine from data
+END_YEAR: int = 2025
 
 # ---- 1. Glacier change data ----
 
@@ -43,6 +48,19 @@ ggmc.functions.format_elevation_change(
     glacier_coordinate_file=GLACIER_COORDINATE_FILE,
     geodetic_change_file=GEODETIC_CHANGE_FILE,
     density_factor=DENSITY_FACTOR
+)
+
+# Input
+REGIONAL_AREA_CHANGE_RATE_FILE: Path = INPUT_PATH / 'regional_area_change.csv'
+
+# OUTPUT
+REGIONAL_AREA_FILE: Path = OUTPUT_PATH / 'regional_area.csv'
+
+ggmc.functions.format_regional_area(
+    regional_area_change_rate_file=REGIONAL_AREA_CHANGE_RATE_FILE,
+    begin_year=BEGIN_YEAR,
+    end_year=END_YEAR,
+    regional_area_file=REGIONAL_AREA_FILE
 )
 
 # ---- 2. Kriging spatial anomalies ----
@@ -80,8 +98,6 @@ ggmc.functions.calculate_global_glacier_spatial_anomaly(
 
 # ---- 3. Kriging global CE spatial anomaly ----
 
-# TODO: Determine from data
-END_YEAR: int = 2025
 MIN_YEAR_GEO_OBS: int = 0
 
 # NOTE: Hugonnet 5-year estimates are only dropped if min_length_geo >= 5
@@ -202,7 +218,6 @@ FIN_YR: int = 2025
 
 # Input
 ZEMP_REGIONAL_SERIES_DIR: Path = INPUT_PATH / 'zemp_etal_regional_series'
-REGIONAL_AREA_CHANGE_FILE: Path = INPUT_PATH / 'Regional_area_change_Zemp_for_spt_CEs.csv'
 
 # Output
 MASS_LOSS_DIR: Path = OUTPUT_PATH / 'mass_loss'
@@ -210,7 +225,7 @@ MASS_LOSS_DIR: Path = OUTPUT_PATH / 'mass_loss'
 ggmc.functions.calculate_regional_mass_loss(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     region_oce_dir=REGION_OCE_DIR,
-    regional_area_change_file=REGIONAL_AREA_CHANGE_FILE,
+    regional_area_file=REGIONAL_AREA_FILE,
     rgi_area_file=RGI_AREA_FILE,
     zemp_regional_series_dir=ZEMP_REGIONAL_SERIES_DIR,
     ini_yr=INI_YR,
@@ -305,52 +320,17 @@ ggmc.creation.oce2tiles_05_grid_per_region(
 
 # ---- 3. Meters water equivalent to gigatonnes and area change 0.5 grid per region ----
 
-# NOTE: Why is the Regional_area_change_Zemp_for_spt_CEs.csv not used here?
-AREA_REF_YEAR: Dict[str, int] = {
-    'ACN': 2000,
-    'ACS': 2000,
-    'ALA': 2009,
-    'ANT': 1989,
-    'ASC': 2003,
-    'ASE': 2003,
-    'ASN': 2011,
-    'ASW': 2003,
-    'CAU': 2014,
-    'CEU': 2003,
-    'GRL': 2001,
-    'ISL': 2000,
-    'NZL': 1978,
-    'RUA': 2006,
-    'SA1': 2000,
-    'SA2': 2000,
-    'SCA': 2002,
-    'SJM': 2001,
-    'TRP': 2000,
-    'WNA': 2006
-}
+AREA_REF_YEAR: Dict[str, int] = (
+  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
+  .set_index('region_id')['reference_year']
+  .to_dict()
+)
 
-AREA_CHG_RATE: Dict[str, float] = {
-    'ACN': -0.07,
-    'ACS': -0.08,
-    'ALA': -0.48,
-    'ANT': -0.27,
-    'ASC': -0.18,
-    'ASE': -0.47,
-    'ASN': -0.43,
-    'ASW': -0.36,
-    'CAU': -0.53,
-    'CEU': -0.93,
-    'GRL': -0.82,
-    'ISL': -0.36,
-    'NZL': -0.69,
-    'RUA': -0.08,
-    'SA1': -0.18,
-    'SA2': -0.18,
-    'SCA': -0.27,
-    'SJM': -0.26,
-    'TRP': -1.19,
-    'WNA': -0.54
-}
+AREA_CHG_RATE: Dict[str, float] = (
+  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
+  .set_index('region_id')['change_rate_percentyear']
+  .to_dict()
+)
 
 # Output
 AREA_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'area_change_by_region_0.5'
