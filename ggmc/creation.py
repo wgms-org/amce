@@ -125,11 +125,10 @@ def oce2tiles_05_grid_per_region(
 
         # Loop through all tiles
         for idx_tile in grid_df.index:
-            print(f'{grid_lon}, {grid_lat}')
-
             grid_lat = grid_df["LAT_GRID"].loc[idx_tile]
             grid_lon = grid_df["LON_GRID"].loc[idx_tile]
             grid_area = grid_df["Area"].loc[idx_tile]
+            print(f'{grid_lon}, {grid_lat}')
 
             # Glaciers that belong in this tile
             idx_within_tile = np.logical_and.reduce((sig_dh_df["CenLat"] >= grid_lat - 0.25,
