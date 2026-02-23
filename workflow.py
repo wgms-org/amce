@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-import ggmc.creation
-import ggmc.functions
+import amce.creation
+import amce.functions
 
 
 # ---- Constants ----
@@ -26,7 +26,7 @@ END_YEAR: int = 2025
 
 MASS_BALANCE_FILE: Path = INPUT_PATH / 'fog_bw-bs-ba.csv'
 
-ggmc.functions.format_mass_balance_data(
+amce.functions.format_mass_balance_data(
     input_file=MASS_BALANCE_FILE,
     begin_year=BEGIN_YEAR,
     output_dir=OUTPUT_PATH,
@@ -41,7 +41,7 @@ INVESTIGATORS_TO_DROP: List[str] = ['Robert McNabb', 'Thorsten Seehaus']
 GLACIER_COORDINATE_FILE: Path = OUTPUT_PATH / 'FOG_coord.csv'
 GEODETIC_CHANGE_FILE: Path = OUTPUT_PATH / '_FOG_GEO_MASS_BALANCE_DATA.csv'
 
-ggmc.functions.format_elevation_change(
+amce.functions.format_elevation_change(
     elevation_change_file=ELEVATION_CHANGE_FILE,
     glacier_series_file=GLACIER_SERIES_FILE,
     investigators_to_drop=INVESTIGATORS_TO_DROP,
@@ -56,7 +56,7 @@ REGIONAL_AREA_CHANGE_RATE_FILE: Path = INPUT_PATH / 'regional_area_change.csv'
 # OUTPUT
 REGIONAL_AREA_FILE: Path = OUTPUT_PATH / 'regional_area.csv'
 
-ggmc.functions.format_regional_area(
+amce.functions.format_regional_area(
     regional_area_change_rate_file=REGIONAL_AREA_CHANGE_RATE_FILE,
     begin_year=BEGIN_YEAR,
     end_year=END_YEAR,
@@ -80,7 +80,7 @@ LOOKUP_ANOMALY_DIR: Path = OUTPUT_PATH / 'LOOKUP_spatial_and_reg_ids'
 LONG_NORM_ANOMALY_DIR: Path = OUTPUT_PATH / 'LONG-NORM_spatial_gla_anom'
 
 # TODO: Expose region configuration as parameter
-ggmc.functions.calculate_global_glacier_spatial_anomaly(
+amce.functions.calculate_global_glacier_spatial_anomaly(
     year_ini=YEAR_INI,
     year_fin=YEAR_FIN,
     begin_year=BEGIN_YEAR,
@@ -106,7 +106,7 @@ MIN_LENGTH_GEO: float = 5.0
 # Output
 REGION_OCE_DIR: Path = OUTPUT_PATH / 'OCE_files_by_region'
 
-ggmc.functions.calculate_consensus_estimate_and_error_global_glacier_regional_anomaly(
+amce.functions.calculate_consensus_estimate_and_error_global_glacier_regional_anomaly(
     begin_year=BEGIN_YEAR,
     end_year=END_YEAR,
     min_year_geo_obs=MIN_YEAR_GEO_OBS,
@@ -175,7 +175,7 @@ RGI_ATTRIBUTE_DIR: Path = INPUT_PATH / '00_rgi60/00_rgi60_attribs'
 # Output
 REGIONAL_BALANCE_DIR: Path = OUTPUT_PATH / 'regional_balance'
 
-ggmc.functions.calculate_regional_mass_balance(
+amce.functions.calculate_regional_mass_balance(
     region_oce_dir=REGION_OCE_DIR,
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     regions=REGIONS,
@@ -186,7 +186,7 @@ ggmc.functions.calculate_regional_mass_balance(
     rgi_attribute_dir=RGI_ATTRIBUTE_DIR
 )
 
-ggmc.functions.compile_regional_mass_balance(
+amce.functions.compile_regional_mass_balance(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     regions=REGIONS
 )
@@ -198,7 +198,7 @@ GLIMS_ATTRIBUTE_AREA_FILE: Path = INPUT_PATH / 'glims_CAU_attributes.csv'
 # Output
 REGIONAL_BALANCE_ESSD_DIR: Path = OUTPUT_PATH / 'regional_balance_essd'
 
-ggmc.functions.calculate_regional_mass_balance_essd(
+amce.functions.calculate_regional_mass_balance_essd(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     rgi_code=RGI_CODE,
     rgi_region=RGI_REG,
@@ -222,7 +222,7 @@ ZEMP_REGIONAL_SERIES_DIR: Path = INPUT_PATH / 'zemp_etal_regional_series'
 # Output
 MASS_LOSS_DIR: Path = OUTPUT_PATH / 'mass_loss'
 
-ggmc.functions.calculate_regional_mass_loss(
+amce.functions.calculate_regional_mass_loss(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     region_oce_dir=REGION_OCE_DIR,
     regional_area_file=REGIONAL_AREA_FILE,
@@ -291,7 +291,7 @@ REGIONS_SAN: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA'
 # Output
 REGIONAL_TILE_DIR: Path = OUTPUT_PATH / 'Tiles_by_region_0.5'
 
-ggmc.creation.grid_tiles_per_region(
+amce.creation.grid_tiles_per_region(
     rgi_region=RGI_REGION,
     rgi_code=RGI_CODE,
     regions=REGIONS_SAN,
@@ -309,7 +309,7 @@ YMAX: int = 2025
 # Output
 OCE_TILE_DIR: Path = OUTPUT_PATH / 'OCE_tiles_by_region_0.5'
 
-ggmc.creation.oce2tiles_05_grid_per_region(
+amce.creation.oce2tiles_05_grid_per_region(
     regions=REGIONS,
     ymin=YMIN,
     ymax=YMAX,
@@ -336,7 +336,7 @@ AREA_CHG_RATE: Dict[str, float] = (
 AREA_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'area_change_by_region_0.5'
 MASS_CHANGE_GRID_DIR: Path = OUTPUT_PATH / 'mass_change_by_region_0.5'
 
-ggmc.creation.areachange_grid_per_region(
+amce.creation.areachange_grid_per_region(
     regions=REGIONS,
     area_ref_year=AREA_REF_YEAR,
     area_chg_rate=AREA_CHG_RATE,
@@ -353,7 +353,7 @@ ggmc.creation.areachange_grid_per_region(
 # Output
 GLOBAL_GRID_DIR: Path = OUTPUT_PATH / 'global_grid_0.5'
 
-ggmc.creation.tiles_to_global_grid(
+amce.creation.tiles_to_global_grid(
     ymin=YMIN,
     ymax=YMAX,
     mass_change_grid_dir=MASS_CHANGE_GRID_DIR,
@@ -367,7 +367,7 @@ ggmc.creation.tiles_to_global_grid(
 # Output
 GLOBAL_GRID_NETCDF_DIR: Path = OUTPUT_PATH / 'global_grid_netcdf_0.5'
 
-ggmc.creation.csv2netcdf4_globalGrid(
+amce.creation.csv2netcdf4_globalGrid(
     ymin=YMIN,
     ymax=YMAX,
     global_grid_dir=GLOBAL_GRID_DIR,

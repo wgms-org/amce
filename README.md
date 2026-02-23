@@ -5,7 +5,7 @@
 ```sh
 mamba env create --file environment.yaml
 # mamba env update --file environment.yaml --prune
-conda activate ggmc
+conda activate amce
 ```
 
 ## Structure
@@ -14,11 +14,6 @@ conda activate ggmc
   - `input/`: Input data
   - `output/`: Output data
 - `tests/`: Pytest test suite. Mostly empty and out of date.
-- `ggmc/`
-    - `functions.py`: Principal initial workflow functions
-    - `helpers.py`: Helper functions
-    - `kriging.py`: Kriging related functions
-    - `creation.py`: Principal creation workflow functions
-    - `propagation.py`: Error propagation functions
+- `amce/`
 - `environment.yaml`: Conda environment file
-- `ggmc_workflow.py`: Workflow script
+- `workflow.py`: Workflow script

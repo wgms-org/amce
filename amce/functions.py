@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from ggmc import helpers, kriging, propagation
+from amce import helpers, kriging, propagation
 
 
 def format_mass_balance_data(

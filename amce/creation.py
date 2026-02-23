@@ -7,7 +7,7 @@ import pandas as pd
 import rioxarray  # Register raterio drivers
 import xarray as xr
 
-from ggmc import propagation
+from amce import propagation
 
 
 def grid_tiles_per_region(

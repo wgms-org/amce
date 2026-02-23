@@ -1,4 +1,4 @@
-name: ggmc
+name: amce
 channels:
   - conda-forge
   - defaults
