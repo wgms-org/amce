@@ -90,8 +90,8 @@ def format_global_grid(
     stats = pd.read_csv(stats_path)
     sample = round(stats.set_index('region_code').loc['GLOBAL']['percentage_area_obs'])
     # Update attributes
-    begin_year = ds['year'].min()
-    end_year = ds['year'].max()
+    begin_year = ds['time'].dt.year.min().item()
+    end_year = ds['time'].dt.year.max().item()
     ds.attrs.update({
         'created_by': 'World Glacier Monitoring Service (WGMS) - wgms@geo.uzh.ch',
         'data_version': f'https://doi.org/10.5904/wgms-amce-{version}',
@@ -100,6 +100,8 @@ def format_global_grid(
         'publication': "Dussaillant, I., Hugonnet, R., Huss, M., Berthier, E., Bannwart, J., Paul, F., and Zemp, M. (2025): Annual mass change of the world's glaciers from 1976 to 2024 by temporal downscaling of satellite data with in-situ observations. Earth System Science Data, https://doi.org/10.5194/essd-17-1977-2025",
         'dataset_description': f'Horizontal resolution: 0.5° (latitude - longitude), GCS_WGS_1984 | Temporal resolution: Annual, hydrological year | Temporal coverage: Hydrological years from {begin_year} to {end_year} | Observational sample: {sample}% of world glaciers with valid observations | Spatial interpolation method: Kriging'
     })
+    del ds.attrs['institution']
+    del ds.attrs['project']
     # Write to file
     new_path = PUBLISH_DIR / 'global_grid.nc4'
     if new_path.exists():
@@ -234,20 +236,20 @@ def format_readme(
 
 
 def format_website(
-    version: str,
-    begin_year: int,
-    begin_year_min: int,
-    begin_year_max: int,
-    end_year: int,
+    version: str
 ) -> None:
+    global_df = pd.read_csv(PUBLISH_DIR / 'global.csv')
+    region_dfs = [pd.read_csv(path) for path in (PUBLISH_DIR / 'region').glob('*.csv')]
+    zip_path = PUBLISH_DIR / f'wgms-amce-{version}.zip'
+    kwargs = {
+        'begin_year': global_df['year'].min(),
+        'end_year': global_df['year'].max(),
+        'begin_year_min': min(df['year'].min() for df in region_dfs),
+        'begin_year_max': max(df['year'].min() for df in region_dfs),
+        'megabytes': round(zip_path.stat().st_size / 1e6)
+    }
     template = Path('templates/website.html.jinja').read_text()
-    text = jinja2.Template(template).render(
-        version=version,
-        begin_year=begin_year,
-        begin_year_min=begin_year_min,
-        begin_year_max=begin_year_max,
-        end_year=end_year
-    )
+    text = jinja2.Template(template).render(version=version, **kwargs)
     new_path = PUBLISH_DIR / 'website.html'
     new_path.write_text(text)
 
@@ -279,21 +281,7 @@ def build_doi_release(
             zip.write(path, arcname=f'region/{path.name}')
         for path in (PUBLISH_DIR / 'glacier').glob('*.csv'):
             zip.write(path, arcname=f'glacier/{path.name}')
-    # Extract begin and years from global file
-    global_df = pd.read_csv(PUBLISH_DIR / 'global.csv')
-    begin_year = global_df['year'].min()
-    end_year = global_df['year'].max()
-    # Extract begin year range across regions
-    region_dfs = [pd.read_csv(path) for path in (PUBLISH_DIR / 'region').glob('*.csv')]
-    begin_year_min = min(df['year'].min() for df in region_dfs)
-    begin_year_max = max(df['year'].min() for df in region_dfs)
-    format_website(
-        version=version,
-        begin_year=begin_year,
-        begin_year_min=begin_year_min,
-        begin_year_max=begin_year_max,
-        end_year=end_year
-    )
+    format_website(version=version)
 
 
 # --- Website figures ----
