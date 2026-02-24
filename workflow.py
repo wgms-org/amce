@@ -5,6 +5,7 @@ import pandas as pd
 
 import amce.creation
 import amce.functions
+import amce.publish
 
 
 # ---- Constants ----
@@ -373,3 +374,17 @@ amce.creation.csv2netcdf4_globalGrid(
     global_grid_dir=GLOBAL_GRID_DIR,
     global_grid_netcdf_dir=GLOBAL_GRID_NETCDF_DIR
 )
+
+#####################################
+# ---- Part 3: Publishing workflow --
+
+VERSION: str = '2026-02-10'
+
+amce.publish.build_doi_release(
+    mass_loss_dir=MASS_LOSS_DIR,
+    regional_balance_essd_dir=REGIONAL_BALANCE_ESSD_DIR,
+    global_grid_netcdf_dir=GLOBAL_GRID_NETCDF_DIR,
+    version=VERSION
+)
+
+amce.publish.build_website_figures()

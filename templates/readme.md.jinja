@@ -1,0 +1,84 @@
+# amce: Annual mass-change estimates for the world's glaciers
+
+This dataset of glacier mass change is derived from glacier observations in the WGMS Fluctuations of Glaciers database (https://doi.org/wgms-fog-{{version}}) with the code at https://github.com/wgms-org/amce. Geostatistical modelling is used to temporally downscale multi-year glacier-wide elevation changes from remote sensing with annual mass-changes from field measurements to produce an annual mass change timeseries for every glacier. The results are then aggregated by region, 0.5° grid cell, and globally.
+
+## Citation
+
+Please cite the dataset:
+
+> WGMS ({{version[:4]}}): Annual mass-change estimates for the world's glaciers. Individual glacier time series and gridded data products. Digital media. https://doi.org/10.5904/wgms-amce-{{version}}
+
+As well as the related publication describing the methods:
+
+> Dussaillant, I., Hugonnet, R., Huss, M., Berthier, E., Bannwart, J., Paul, F., and Zemp, M. (2025): Annual mass change of the world's glaciers from 1976 to 2024 by temporal downscaling of satellite data with in-situ observations. Earth System Science Data 17(5): 1977–2006. https://doi.org/10.5194/essd-17-1977-2025
+
+## Glossary
+
+In the following sections describing the data, the following terms are used:
+
+* hydrological year: A 12-month period starting from 1 October in the Northern Hemisphere, from 1 April in the Southern Hemisphere, and 1 January in the tropics (region `TRP`). For brevity, hydrological years are labeled by their (end) calendar year.
+* meters water equivalent (m w.e.): Area-average mass change expressed as the thickness of water that would be produced if the mass change were distributed evenly across the glacier area.
+* gigatonnes (Gt): Mass change where 1 Gt = 10^9 tonnes = 10^12 kg
+* millimeters sea level equivalent (mm SLE): The change in global mean sea level that would occur if the glacier mass change were distributed evenly across the global ocean.
+
+## Data
+
+### Global (`global.csv`)
+
+A single CSV file with global glacier mass change and area for each hydrological year.
+
+* `year`: Hydrological year
+* `area_km2`: Glacier area [km²]
+* `mwe`: Area-average glacier mass change [m w.e.]
+* `mwe_sigma`: 1-sigma uncertainty of `mwe`
+* `mwe_cumsum`: Cumulative sum of `mwe`
+* `gt`: Glacier mass change [Gt]
+* `gt_sigma`: 1-sigma uncertainty of `gt`
+* `gt_cumsum`: Cumulative sum of `gt`
+* `gt_cumsum_sigma`: 1-sigma uncertainty of `gt_cumsum`
+* `mmsle`: Glacier mass change [mm SLE]
+* `mmsle_sigma`: 1-sigma uncertainty of `mmsle`
+* `mmsle_cumsum`: Cumulative sum of `mmsle`
+* `mmsle_cumsum_sigma`: 1-sigma uncertainty of `mmsle_cumsum`
+
+### Global grid (`global_grid.nc4`)
+
+A single netCDF4 file with glacier mass change and area for each 0.5° grid cell and hydrological year.
+
+* Dimensions (per https://cfconventions.org)
+  * `time`: Hydrological year as the first date of the year (e.g., 1976-01-01)
+  * `lat`: Latitude of grid cell center (WGS 84 – EPSG:4326)
+  * `lon`: Longitude of grid cell center (WGS 84 – EPSG:4326)
+* Data variables
+  * `area_km2`: Glacier area [km²]
+  * `mwe`: Area-average glacier mass change [m w.e.]
+  * `mwe_sigma`: 1-sigma uncertainty of `mwe`
+  * `gt`: Glacier mass change [Gt]
+  * `gt_sigma`: 1-sigma uncertainty of `gt`
+
+### Region (`region/{region}.csv`)
+
+For each first-order 2017 GTN-G glacier region (https://doi.org/10.5904/gtng-glacreg-2017-07), a CSV file with glacier mass change and area for each hydrological year. The Southern Andes (`SAN`) are split into two subregions Patagonia (`SA1`) and Central (`SA2`).
+
+* `year`: Hydrological year
+* `area_km2`: Glacier area [km²]
+* `mwe`: Area-average glacier mass change [m w.e.]
+* `mwe_sigma`: 1-sigma uncertainty of `mwe`
+* `gt`: Glacier mass change [Gt]
+* `gt_sigma`: 1-sigma uncertainty of `gt`
+
+### Glacier (`glacier/{region}_{file}.csv`)
+
+For each first-order 2017 GTN-G glacier region (https://doi.org/10.5904/gtng-glacreg-2017-07), multiple CSV files with area-average glacier mass change for each glacier and hydrological year. The Southern Andes (`SAN`) are split into two subregions Patagonia (`SA1`) and Central (`SA2`).
+
+* `{region}_metadata.csv`
+  * `outline_id`: Glacier outline identifier as the Randolph Glacier Inventory (RGI) 6.0 () outline identifier or, in the Caucasus (`CAU`) only, the Global Land Ice Measurements from Space (GLIMS) glacier identifier of the 2014 outlines in Tielidze & Wheate 2018 (https://doi.org/10.5194/tc-12-81-2018).
+  * `glacier_id`: Glacier identifier in the WGMS Fluctuations of Glaciers (FoG) database (https://doi.org/wgms-fog-{{version}}).
+  * `latitude`: Centerpoint latitude of the glacier outline (WGS 84 – EPSG:4326)
+  * `longitude`: Centerpoint longitude of the glacier outline (WGS 84 – EPSG:4326)
+  * `area_km2`: Glacier outline area [km²]
+* `{region}_mwe.csv`: Area-average glacier mass change [m w.e.] for each `outline_id` and `year`
+* `{region}_mwe_sigma.csv`: Total 1-sigma uncertainty of `mwe`
+* `{region}_mwe_sigma_anom.csv`: Component of `mwe_sigma` from glaciological anomaly
+* `{region}_mwe_sigma_dh.csv`: Component of `mwe_sigma` from geodetic elevation change
+* `{region}_mwe_sigma_rho.csv`: Component of `mwe_sigma` from density conversion

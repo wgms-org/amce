@@ -129,10 +129,8 @@ dmypy.json
 .pyre/
 
 # Ignore data
-*/in_data*
-*/out_data*
-0_original_codes/
 data/
+publish/
 
 # Mac OS
 .DS_Store
