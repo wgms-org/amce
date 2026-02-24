@@ -24,3 +24,4 @@ conda activate amce
   - `publish.py`: Produce final data and figures
 - `environment.yaml`: Conda environment file
 - `workflow.py`: Workflow script
+- `constants.py`: Workflow constants
