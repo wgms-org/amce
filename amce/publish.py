@@ -319,7 +319,7 @@ p9.theme_update(
 
 def plot_global_annual_mass_change_bars() -> None:
     # https://wgms.ch/sea-level-rise/
-    # https://wgms.ch/data/faq/_Fig2_global_glacier_cumulative_mass_changes.svg
+    # https://wgms.ch/data/faq/_Fig2_global_glacier_mass_changes_bars.svg
     temp = pd.read_csv(PUBLISH_DIR / 'global.csv')
     df = pd.DataFrame({
         'year': temp['year'],
@@ -336,10 +336,10 @@ def plot_global_annual_mass_change_bars() -> None:
         p9.scale_y_continuous(
             breaks=(-724, -362, 0, 362),
             labels=(
-                '$-724 Gt$\n$2$ mm'.replace(' ', u'\u2009'),
-                '$-362 Gt$\n$1$ mm'.replace(' ', u'\u2009'),
-                '$0$',
-                '$362 Gt$\n$-1$ mm'.replace(' ', u'\u2009')
+                '−724 Gt\n2 mm'.replace(' ', u'\u2009'),
+                '−362 Gt\n1 mm'.replace(' ', u'\u2009'),
+                '0',
+                '362 Gt\n−1 mm'.replace(' ', u'\u2009')
             ),
             limits=(-724, 362)
         ) +
@@ -350,7 +350,7 @@ def plot_global_annual_mass_change_bars() -> None:
             x='Year',
             y='Mass change (Gt) · Sea level rise (mm)',
             title='Global annual glacier mass change',
-            subtitle='About $-362$ Gt raises global sea level by 1 mm.',
+            subtitle='About −362 Gt raises global sea level by 1 mm.',
         )
     )
     plot.save(
@@ -377,11 +377,11 @@ def plot_global_cumulative_annual_mass_change() -> None:
         p9.scale_y_continuous(
             breaks=(-10860, -7240, -3620, 0, 3620),
             labels=(
-                '$-10860 Gt$\n$30$ mm'.replace(' ', u'\u2009'),
-                '$-7240 Gt$\n$20$ mm'.replace(' ', u'\u2009'),
-                '$-3620 Gt$\n$10$ mm'.replace(' ', u'\u2009'),
-                '$0$',
-                '$3620 Gt$\n$-10$ mm'.replace(' ', u'\u2009')
+                '−10860 Gt\n30 mm'.replace(' ', u'\u2009'),
+                '−7240 Gt\n20 mm'.replace(' ', u'\u2009'),
+                '−3620 Gt\n10 mm'.replace(' ', u'\u2009'),
+                '0',
+                '3620 Gt\n−10 mm'.replace(' ', u'\u2009')
             ),
             limits=(-10860, 3620)
         ) +
@@ -392,7 +392,7 @@ def plot_global_cumulative_annual_mass_change() -> None:
             x='Year',
             y='Mass change (Gt) · Sea level rise (mm)',
             title='Global cumulative glacier mass change',
-            subtitle='Relative to 1975. About $-362$ Gt raises global sea level by 1 mm.'
+            subtitle='Relative to 1975. About −362 Gt raises global sea level by 1 mm.'
         )
     )
     plot.save(
@@ -447,7 +447,7 @@ def plot_regional_annual_mass_change(
     df['mwe_relative_sign'] = df['mwe_relative'].apply(np.sign).eq(1)
     df['mwe_sign'] = df['mwe'].apply(np.sign).eq(1)
     df['gt_label'] = df['gt'].round(0).astype('Int64').apply(
-        lambda x: pd.NA if pd.isna(x) else f'${int(x)}$'
+        lambda x: pd.NA if pd.isna(x) else f'{int(x)}'.replace('-', '−')
     )
     # Add ' Gt' to each regions' last dm_label
     end_year = df['year'].max()
@@ -503,7 +503,7 @@ def plot_regional_annual_mass_change(
         ) +
         p9.scale_y_continuous(
             breaks=[-3, -2, -1, 0, 1],
-            labels=lambda x: [f'${x}$' for x in x]
+            labels=lambda x: [f'{x}'.replace('-', '−') for x in x]
         ) +
         p9.labs(
             title='Regional annual glacier mass change ({}–{})'.format(end_year - n_years + 1, end_year),
