@@ -1,6 +1,8 @@
 from typing import Dict, List, Tuple
 from pathlib import Path
 
+import pandas as pd
+
 
 VERSION: str = '2026-02-10'
 
@@ -174,3 +176,15 @@ REGIONS_SAN: List[str] = ['ALA', 'WNA', 'ACN', 'ACS', 'GRL', 'ISL', 'SJM', 'SCA'
 # TODO: Merge with INI_YR and FIN_YR
 YMIN: int = 1976
 YMAX: int = 2025
+
+AREA_REF_YEAR: Dict[str, int] = (
+  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
+  .set_index('region_id')['reference_year']
+  .to_dict()
+)
+
+AREA_CHG_RATE: Dict[str, float] = (
+  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
+  .set_index('region_id')['change_rate_percentyear']
+  .to_dict()
+)

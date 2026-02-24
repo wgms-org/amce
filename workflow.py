@@ -1,8 +1,3 @@
-from typing import Dict, List, Tuple
-from pathlib import Path
-
-import pandas as pd
-
 import amce.creation
 import amce.functions
 import amce.publish
@@ -139,18 +134,6 @@ amce.creation.oce2tiles_05_grid_per_region(
 )
 
 # ---- 3. Meters water equivalent to gigatonnes and area change 0.5 grid per region ----
-
-AREA_REF_YEAR: Dict[str, int] = (
-  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
-  .set_index('region_id')['reference_year']
-  .to_dict()
-)
-
-AREA_CHG_RATE: Dict[str, float] = (
-  pd.read_csv(REGIONAL_AREA_CHANGE_RATE_FILE)
-  .set_index('region_id')['change_rate_percentyear']
-  .to_dict()
-)
 
 amce.creation.areachange_grid_per_region(
     regions=REGIONS,
