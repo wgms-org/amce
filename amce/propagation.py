@@ -75,9 +75,7 @@ def distance_to_elevation_change_correlation(distance: np.ndarray) -> np.ndarray
     """
     Convert distance to a spatial correlation of elevation change errors.
 
-    Based on Hugonnet et al. (2021).
-    A third of the partial sill is correlated to 20 km, another third to 50 km and the
-    last third to 500 km.
+    Based on Hugonnet et al. 2021 (https://doi.org/10.1038/s41586-021-03436-z).
 
     Parameters
     ----------
@@ -90,13 +88,14 @@ def distance_to_elevation_change_correlation(distance: np.ndarray) -> np.ndarray
     """
     ps1 = 0.326432
     ps2 = 0.33190818
-    ps3 = 0.34165983
+    ps3 = 0.34165982
     r1 = 20000
     r2 = 50000
     r3 = 500000
     # 1 - (ps1 * (1 - e(-3/r1 * d)) + ps2 * (1 - e(-3/r2 * d)) + ps3 * (1 - e(-3/r3 * d)))
     return (
-        1 - (ps1 + ps2 + ps3) +
+        # Equal to zero
+        # 1 - (ps1 + ps2 + ps3) +
         ps1 * np.exp(-3 / r1 * distance) +
         ps2 * np.exp(-3 / r2 * distance) +
         ps3 * np.exp(-3 / r3 * distance)
@@ -107,7 +106,8 @@ def distance_to_density_correlation(distance: np.ndarray, duration: float = 1.0)
     """
     Convert distance to a spatial correlation of density errors.
 
-    Based on Huss and Hock (2015).
+    Based on Huss et al. (unpublished) using model runs from Huss & Hock 2015
+    (https://doi.org/10.3389/feart.2015.00054).
 
     Parameters
     ----------
@@ -120,6 +120,9 @@ def distance_to_density_correlation(distance: np.ndarray, duration: float = 1.0)
     -------
     Spatial correlation coefficient (between 0 and 1).
     """
+    # Full form of equation 15 in Dussaillant et al. 2025
+    # (https://doi.org/10.5194/essd-17-1977-2025)
+    # Small differences result from rounded sill values
     r1 = 200000
     r2 = 5000000
     f = 0.1709584
@@ -139,7 +142,7 @@ def distance_to_mass_balance_anomaly_correlation(distance: np.ndarray) -> np.nda
     """
     Convert distance to a spatial correlation of mass balance anomaly errors.
 
-    Based on Dussaillant et al. (2024).
+    Based on Dussaillant et al. 2025 (https://doi.org/10.5194/essd-17-1977-2025).
 
     Parameters
     ----------
@@ -150,6 +153,7 @@ def distance_to_mass_balance_anomaly_correlation(distance: np.ndarray) -> np.nda
     -------
     Spatial correlation coefficient (between 0 and 1).
     """
+    # Three ranges and partial sills for three exponential models (first range = nugget)
     r1 = 5051.675
     r2 = 99851.27
     r3 = 5000000
@@ -158,7 +162,8 @@ def distance_to_mass_balance_anomaly_correlation(distance: np.ndarray) -> np.nda
     ps3 = 0.635414
     # 1 - (ps1 * (1 - e(-3/r1 * d)) + ps2 * (1 - e(-3/r2 * d)) + ps3 * (1 - e(-3/r3 * d)))
     return (
-        1 - (ps1 + ps2 + ps3) +
+        # Equal to zero
+        # 1 - (ps1 + ps2 + ps3) +
         ps1 * np.exp(-3 / r1 * distance) +
         ps2 * np.exp(-3 / r2 * distance) +
         ps3 * np.exp(-3 / r3 * distance)
