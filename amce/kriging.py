@@ -5,43 +5,7 @@ import pandas as pd
 import pyproj
 from pykrige.ok import OrdinaryKriging
 
-#################################
-# ESTIMATED CORRELATION FUNCTIONS
-#################################
-
-def ba_anom_spatialcorr(d: np.ndarray):
-    """
-    Convert distance to a spatial correlation of mass balance anomaly errors.
-
-    Based on Dussaillant et al. 2025 (https://doi.org/10.5194/essd-17-1977-2025).
-
-    Parameters
-    ----------
-    d
-        Pairwise glacier distance (meters).
-
-    Returns
-    -------
-    Spatial correlation coefficient (between 0 and 1).
-    """
-    # Full form of equation 4 in Dussaillant et al. 2025
-    # (https://doi.org/10.5194/essd-17-1977-2025)
-    # Small differences result from removal of first (nugget) range
-    # and rounding of remaining partial sills
-    r1 = 87.9259877
-    r2 = 206635.202
-    r3 = 5000000
-    ps1 = 0.04484324
-    ps2 = 0.36955494
-    ps3 = 0.58560182
-    # 1 - (ps1 * (1 - e(-3/r1 * d)) + ps2 * (1 - e(-3/r2 * d)) + ps3 * (1 - e(-3/r3 * d)))
-    return (
-        # Equal to zero
-        # 1 - (ps1 + ps2 + ps3) +
-        ps1 * np.exp(-3 / r1 * d) +
-        ps2 * np.exp(-3 / r2 * d) +
-        ps3 * np.exp(-3 / r3 * d)
-    )
+import amce.propagation
 
 ############################################################################
 # COORDINATE TRANSFORMATIONS (FOR SPEED COMPUTING DISTS DURING ERROR PROPAG)
@@ -160,9 +124,11 @@ def krige_ba_anom(xobs: np.ndarray, yobs: np.ndarray, ba_anom_obs: np.ndarray, x
     # In mm w.e. yr-1, the STD of annual anomalies globally is 470, so we take its square
     # var = 470**2
 
-    def variogram_func(placeholder, d: np.ndarray):
+    def variogram_func(_, distance: np.ndarray):
         """The variogram is the variance minus the covariance, and the covariance is the variance times correlation."""
-        return var * (1 - ba_anom_spatialcorr(d))
+        return var * (
+            1 - amce.propagation.distance_to_mass_balance_anomaly_correlation(distance)
+        )
 
     # If there is only a single observation, kriging fails
     if len(xobs) == 1:

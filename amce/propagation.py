@@ -153,13 +153,16 @@ def distance_to_mass_balance_anomaly_correlation(distance: np.ndarray) -> np.nda
     -------
     Spatial correlation coefficient (between 0 and 1).
     """
-    # Three ranges and partial sills for three exponential models (first range = nugget)
-    r1 = 5051.675
-    r2 = 99851.27
+    # Full form of equation 4 in Dussaillant et al. 2025
+    # (https://doi.org/10.5194/essd-17-1977-2025)
+    # Small differences result from removal of first (nugget) range
+    # and rounding of remaining partial sills
+    r1 = 87.9259877
+    r2 = 206635.202
     r3 = 5000000
-    ps1 = 0.224308
-    ps2 = 0.140278
-    ps3 = 0.635414
+    ps1 = 0.04484324
+    ps2 = 0.36955494
+    ps3 = 0.58560182
     # 1 - (ps1 * (1 - e(-3/r1 * d)) + ps2 * (1 - e(-3/r2 * d)) + ps3 * (1 - e(-3/r3 * d)))
     return (
         # Equal to zero
