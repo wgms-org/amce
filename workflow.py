@@ -67,7 +67,7 @@ amce.functions.calculate_regional_mass_balance(
     region_oce_dir=REGION_OCE_DIR,
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     regions=REGIONS,
-    rgi_reg=RGI_REG,
+    rgi_region=RGI_REGION,
     rgi_code=RGI_CODE,
     rgi_area_file=RGI_AREA_FILE,
     glims_attribute_file=GLIMS_ATTRIBUTE_FILE,
@@ -82,7 +82,7 @@ amce.functions.compile_regional_mass_balance(
 amce.functions.calculate_regional_mass_balance_essd(
     regional_balance_dir=REGIONAL_BALANCE_DIR,
     rgi_code=RGI_CODE,
-    rgi_region=RGI_REG,
+    rgi_region=RGI_REGION,
     glacier_id_lut_file=GLACIER_ID_LUT_FILE,
     glims_attribute_file=GLIMS_ATTRIBUTE_AREA_FILE,
     rgi_attribute_dir=RGI_ATTRIBUTE_DIR,
@@ -103,7 +103,7 @@ amce.functions.calculate_regional_mass_loss(
     fin_yr=FIN_YR,
     regions=REGIONS,
     rgi_code=RGI_CODE,
-    rgi_reg=RGI_REG,
+    rgi_region=RGI_REGION,
     mass_loss_dir=MASS_LOSS_DIR
 )
 
@@ -113,8 +113,8 @@ amce.functions.calculate_regional_mass_loss(
 # ---- 0. Grid tiles per region ----
 
 amce.creation.grid_tiles_per_region(
-    rgi_region=RGI_REGION,
-    rgi_code=RGI_CODE,
+    rgi_region=RGI_REGION_SAN,
+    rgi_code=RGI_CODE_SAN,
     regions=REGIONS_SAN,
     rgi_attribute_dir=RGI_ATTRIBUTE_DIR,
     glims_attribute_area_file=GLIMS_ATTRIBUTE_AREA_FILE,

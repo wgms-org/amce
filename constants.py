@@ -72,8 +72,8 @@ MIN_YEAR_GEO_OBS: int = 0
 # NOTE: Hugonnet 5-year estimates are only dropped if min_length_geo >= 5
 MIN_LENGTH_GEO: float = 5.0
 
-# TODO: Merge with REGIONS and RGI_CODE and move to configuration
-RGI_REG: Dict[str, str] = {
+# TODO: Merge with REGIONS and RGI_CODE
+RGI_REGION: Dict[str, str] = {
   'ACN' : 'ArcticCanadaNorth',
   'WNA' : 'WesternCanadaUS',
   'ALA' : 'Alaska',
@@ -126,7 +126,7 @@ INI_YR: int = 1976
 # TODO: Merge with END_YEAR
 FIN_YR: int = 2025
 
-RGI_REGION: Dict[str, str] = {
+RGI_REGION_SAN: Dict[str, str] = {
     'ACN' : 'ArcticCanadaNorth',
     'WNA' : 'WesternCanadaUS',
     'ALA' : 'Alaska',
@@ -148,7 +148,7 @@ RGI_REGION: Dict[str, str] = {
     'SAN' : 'SouthernAndes'
 }
 
-RGI_CODE: Dict[str, str] = {
+RGI_CODE_SAN: Dict[str, str] = {
     'ALA' : '01',
     'WNA' : '02',
     'ACN' : '03',

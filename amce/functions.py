@@ -788,7 +788,7 @@ def calculate_regional_mass_balance(
     region_oce_dir: Path,
     regional_balance_dir: Path,
     regions: List[str],
-    rgi_reg: dict,
+    rgi_region: dict,
     rgi_code: dict,
     rgi_area_file: Path,
     glims_attribute_file: Path,
@@ -840,7 +840,7 @@ def calculate_regional_mass_balance(
             # Convert columns to int
             df.columns = df.columns.astype(int)
 
-        rgi_file = rgi_attribute_dir / f'{rgi_code[region]}_rgi60_{rgi_reg[region]}.csv'
+        rgi_file = rgi_attribute_dir / f'{rgi_code[region]}_rgi60_{rgi_region[region]}.csv'
         rgi_df = pd.read_csv(
             rgi_file, usecols=['RGIId', 'CenLat', 'CenLon', 'Connect'],
             index_col='RGIId', encoding='latin1'
@@ -860,7 +860,7 @@ def calculate_regional_mass_balance(
             rgi_area_df = id_rgi_area_df[id_rgi_area_df['GLACIER_REGION_CODE'] == region]
 
         nb_gla_reg = rgi_area_df.shape[0]
-        tot_area_rgi_reg = rgi_area_df['AREA'].sum()
+        tot_area_rgi_region = rgi_area_df['AREA'].sum()
 
         ## select wgms_ids belonging to the region group
         wgms_id_lst = oce_df.columns.to_list()
@@ -876,7 +876,7 @@ def calculate_regional_mass_balance(
         gla_obs_df = gla_obs_df.reset_index().set_index('RGIId')
 
         if region == 'CAU':
-            tot_area_rgi_reg = id_glims_coords_df['db_area'].sum()
+            tot_area_rgi_region = id_glims_coords_df['db_area'].sum()
             gla_obs_area_coord_df = pd.merge(gla_obs_df, id_glims_coords_df, left_index=True, right_index=True).drop_duplicates()
         else:
             gla_obs_area_coord_df = pd.merge(gla_obs_df, rgi_df, left_index=True, right_index=True)
@@ -884,7 +884,7 @@ def calculate_regional_mass_balance(
         gla_obs_area_coord_df = gla_obs_area_coord_df.reset_index().set_index('WGMS_ID')
         gla_obs_area_coord_df = gla_obs_area_coord_df[~gla_obs_area_coord_df.index.duplicated()]
 
-        print('Area observed (km2):', f'{round(tot_area_obs)} / {round(tot_area_rgi_reg)}')
+        print('Area observed (km2):', f'{round(tot_area_obs)} / {round(tot_area_rgi_region)}')
         print('Glaciers observed (#):', f'{nb_gla_obs} / {nb_gla_reg}')
         ####### Calculate all glaciers time series and uncertainties ##########
 
@@ -952,11 +952,11 @@ def calculate_regional_mass_balance(
         Sig_oce_obs_propag = (Aw_sig_dh_obs**2 + Aw_sig_rho_obs**2 + Aw_sig_anom_obs**2)**0.5
 
         # Defining area-weighted uncertainty of unobserved glaciers based on the mean uncertainty of observed glaciers
-        area_unobs = round(tot_area_rgi_reg, 2) - round(tot_area_obs, 2)
-        sig_W_unobs = Sig_oce_obs_gla * (area_unobs / tot_area_rgi_reg)
+        area_unobs = round(tot_area_rgi_region, 2) - round(tot_area_obs, 2)
+        sig_W_unobs = Sig_oce_obs_gla * (area_unobs / tot_area_rgi_region)
 
         # Area-weight the observed glaciers before combining in final uncertainty
-        sig_W_obs = Sig_oce_obs_propag * (tot_area_obs / tot_area_rgi_reg)
+        sig_W_obs = Sig_oce_obs_propag * (tot_area_obs / tot_area_rgi_region)
 
         # Final regional uncertainty
         reg_sig = np.sqrt(sig_W_obs**2 + sig_W_unobs**2)
@@ -1228,7 +1228,7 @@ def calculate_regional_mass_loss(
     fin_yr: int,
     regions: List[str],
     rgi_code: dict,
-    rgi_reg: dict,
+    rgi_region: dict,
     mass_loss_dir: Path
 ) -> None:
     """
@@ -1322,8 +1322,8 @@ def calculate_regional_mass_loss(
         nb_gla_reg = len(rgi_area_df)
         gla_obs_df = rgi_area_df.loc[id_lst]
 
-        tot_area_rgi_reg = rgi_area_df['AREA'].sum()
-        tot_area_obs_reg = gla_obs_df['AREA'].sum()
+        tot_area_rgi_region = rgi_area_df['AREA'].sum()
+        tot_area_obs_region = gla_obs_df['AREA'].sum()
 
         nb_gla_obs = len(gla_obs_df)
         ba_mwe = ba_df[region]
@@ -1347,7 +1347,7 @@ def calculate_regional_mass_loss(
         reg_file['DM_Gt'] = dm_Gt
         reg_file['sig_tot_DM'] = sig_dm
 
-        reg_file.to_csv(Path(out_DM_series, 'results_region_' + rgi_code[region] + '_' + region + '_' + rgi_reg[region] + '.csv'))
+        reg_file.to_csv(Path(out_DM_series, 'results_region_' + rgi_code[region] + '_' + region + '_' + rgi_region[region] + '.csv'))
 
         Reg_DM_df[region] = dm_Gt
         Reg_sig_DM_df[region] = sig_dm
@@ -1368,7 +1368,7 @@ def calculate_regional_mass_loss(
         sigma_CUM_DM_Gt = sigma_cum.loc[2023]
 
         per_obs = nb_gla_obs * 100 / nb_gla_reg
-        per_area = tot_area_obs_reg * 100 / tot_area_rgi_reg
+        per_area = tot_area_obs_region * 100 / tot_area_rgi_region
         SLE = (-DM_Gt_yr / S_ocean) * 10**6
         Sigma_SLE = (sigma_DM_Gt_yr / S_ocean) * 10**6
 
@@ -1391,7 +1391,7 @@ def calculate_regional_mass_loss(
 
         for index, row in glob_cum_df.iterrows():
             if index == region:
-                row['region']= rgi_reg[region]
+                row['region']= rgi_region[region]
                 row['area_mean_' + str(ini_yr_full_obs) +'-' + str(fin_yr_obs) + ' [km2]'] = "{:.0f}".format(mean_area_full)
                 row['area_mean_' + str(min(PoR)) + '_' + str(max(PoR)) + ' [km2]'] = "{:.0f}".format(mean_area)
                 row['percentage_area_obs'] = per_area
