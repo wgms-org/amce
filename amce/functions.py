@@ -31,8 +31,6 @@ def format_mass_balance_data(
     df = pd.read_csv(input_file)
     column_keys = {
         'ANNUAL_BALANCE': 'ba',
-        'SUMMER_BALANCE': 'bs',
-        'WINTER_BALANCE': 'bw',
         'ANNUAL_BALANCE_UNC': 'ba_unc'
     }
     for column, key in column_keys.items():
