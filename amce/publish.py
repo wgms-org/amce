@@ -602,3 +602,122 @@ def build_website_figures() -> None:
     plot_global_annual_mass_change_bars()
     plot_global_cumulative_annual_mass_change()
     plot_regional_annual_mass_change()
+
+
+def extract_mass_balance_anomaly_glacier_ids(lookup_anomaly_dir: Path) -> set[int]:
+    ids = []
+    for path in lookup_anomaly_dir.glob('*_all_SEL_gla_anomalies.csv'):
+        df = pd.read_csv(path)
+        ids += [int(column) for column in df.columns[1:]]
+    return set(ids)
+
+
+EXCLUDED_MASS_BALANCE_GLACIERS: list[int] = [
+    # --- ASN: Asia North
+    # Hamagury Yuki
+    897,
+    # --- ASC: Asia Central
+    # Urumqi No. 1 east branch
+    1511,
+    # Urumqi No. 1 west branch
+    1512,
+    # --- TRP: Tropics
+    # Yanamarey
+    226,
+    # --- SAN-01: Southern Andes Patagonia
+    # "All except Martial Este"
+    # Martial
+    917,
+    # De Los Tres
+    1675,
+    # --- SAN-02: Southern Andes Central
+    # "All except Echaurren Norte"
+    # Conconta Norte
+    3902,
+    # Brown Superior
+    3903,
+    # Los Amarillos
+    3904,
+    # Amarillo
+    3905,
+    # Mocho Choshuenco (southeast)
+    3972,
+    # --- ANT: Antarctica and Subantarctic
+    # "Dry valley glaciers"
+    878,
+    3973
+]
+
+
+def build_seasonal_regional_mass_change(
+    mass_balance_file: Path,
+    urumqi_missing_years_file: Path,
+    lookup_anomaly_dir: Path,
+    glacier_series_file: Path
+) -> None:
+    # ---- Prepare seasonal mass balances
+    df = pd.read_csv(mass_balance_file)
+    urumqi_missing_years = (
+        pd.read_csv(urumqi_missing_years_file)
+        .rename(columns={'853': 'ANNUAL_BALANCE'})
+        .assign(WGMS_ID=853, GLACIER_REGION_CODE='ASC')
+    )
+    df = pd.concat((df, urumqi_missing_years), ignore_index=True)
+    # Keep all seasonal amplitudes from non-excluded glaciers
+    mask = (
+        df['ANNUAL_BALANCE'].notnull() &
+        df['WINTER_BALANCE'].notnull() &
+        ~df['WGMS_ID'].isin(EXCLUDED_MASS_BALANCE_GLACIERS)
+    )
+    df = df[mask]
+    # --- Calculate annual regional mass balance amplitudes (m w.e.)
+    df['amplitude'] = (df['WINTER_BALANCE'] - df['SUMMER_BALANCE']).abs() / 2
+    amplitudes = df.groupby(['GLACIER_REGION_CODE', 'YEAR'])['amplitude'].mean() * 1e-3
+    # ---- Compute calibrated seasonal annual mass change (Gt)
+    SAN_SUBREGIONS = ['SA1', 'SA2']
+    region_dfs = []
+    for path in PUBLISH_DIR.glob('region/*.csv'):
+        region_df = pd.read_csv(path).set_index('year')
+        region = path.stem
+        amplitude_region = region
+        if region in SAN_SUBREGIONS:
+            amplitude_region = 'SAN'
+        region_amplitude = amplitudes.loc[amplitude_region]
+        winter = region_df['mwe'] / 2 + region_amplitude
+        summer = region_df['mwe'] / 2 - region_amplitude
+        winter_gt = winter * region_df['area_km2'] * 1e-3
+        summer_gt = summer * region_df['area_km2'] * 1e-3
+        region_dfs.append(pd.DataFrame({
+            'region_id': amplitude_region,
+            'year': winter.index,
+            'winter_gt': winter_gt,
+            'summer_gt': summer_gt,
+            'gt': region_df['gt']
+        }))
+    # Sum subregions
+    parent_path = PUBLISH_DIR / 'seasonal'
+    parent_path.mkdir(parents=True, exist_ok=True)
+    (
+        pd.concat(region_dfs, ignore_index=True)
+        .dropna(subset='gt')
+        .convert_dtypes()
+        .groupby(['region_id', 'year'], dropna=False)
+        .sum(min_count=1)
+        .round(3)
+        .to_csv(parent_path / 'region.csv', index=True)
+    )
+    # Compile glacier id | latitude | longitude | seasonal
+    glacier_series = pd.read_csv(
+        glacier_series_file, usecols=['WGMS_ID', 'LATITUDE', 'LONGITUDE']
+    ).set_index('WGMS_ID')
+    seasonal_glacier_ids = set(df['WGMS_ID'])
+    annual_glacier_ids = extract_mass_balance_anomaly_glacier_ids(
+        lookup_anomaly_dir=lookup_anomaly_dir
+    )
+    glacier_ids = sorted(annual_glacier_ids | seasonal_glacier_ids)
+    glaciers = pd.DataFrame({'glacier_id': glacier_ids}).set_index('glacier_id')
+    glaciers[['latitude', 'longitude']] = glacier_series[
+        ['LATITUDE', 'LONGITUDE']
+    ].loc[glacier_ids].round(6)
+    glaciers['seasonal'] = glaciers.index.isin(seasonal_glacier_ids)
+    glaciers.reset_index().to_csv(parent_path / 'glacier.csv', index=False)
