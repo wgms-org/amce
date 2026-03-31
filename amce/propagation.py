@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Callable, Tuple, Union
 
 import numpy as np
 import pyproj.aoi
@@ -197,7 +197,7 @@ def calculate_ij_of_condensed_pairwise(condensed: np.ndarray) -> Tuple[np.ndarra
 
 def regional_sigma(
     sigma: np.ndarray,
-    correlation: np.ndarray,
+    correlation: Union[np.ndarray, float, int],
     ij: Tuple[np.ndarray, np.ndarray] = None
 ) -> np.ndarray:
     """
@@ -208,7 +208,7 @@ def regional_sigma(
     sigma
         Glacier sigma by year (n years, m glaciers) or (m glaciers, ).
     correlation
-        Pairwise glacier correlation (condensed form).
+        Pairwise glacier correlation (condensed form) or scalar value.
     ij
         Precomputed row and column indices of the correlation matrix.
     """
@@ -256,7 +256,7 @@ def geographic_to_distance_sample(
 
 def regional_sigma_sample(
     sigma: np.ndarray,
-    correlation: np.ndarray,
+    correlation: Union[np.ndarray, float, int],
     sample: np.ndarray
 ) -> np.ndarray:
     """
@@ -267,11 +267,11 @@ def regional_sigma_sample(
     sigma
         Glacier sigma (m glaciers, ).
     correlation
-        Glacier correlation (m glaciers, n glaciers).
+        Pairwise glacier correlation (m glaciers, n glaciers) or scalar value.
     sample
         Sample indices (n glaciers, ).
     """
-    m, n = correlation.shape
+    m, n = len(sigma), len(sample)
     pairs = sigma.reshape((-1, 1)) @ sigma[sample].reshape((1, -1)) * correlation
     # Sum pairwise error terms and scale by the total number of glaciers
     return np.atleast_1d(np.sqrt(np.sum(pairs) * m**2 / (m * n)))
@@ -344,7 +344,10 @@ def regional_sigma_wrapper(
         if verbose:
             print(f'[INFO] Spatial correlation for {name}')
         # TODO: Use float32 to reduce memory
-        correlation = correlation_func(distances)
+        if isinstance(correlation_func, Callable):
+            correlation = correlation_func(distances)
+        else:
+            correlation = correlation_func
         all_equal = (sigma == sigma[0]).all()
         if not all_equal and name in ('dh', 'rho') and verbose:
             print(f'[WARNING] sigma_{name} not equal for all years')
