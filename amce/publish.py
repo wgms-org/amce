@@ -706,7 +706,7 @@ def build_seasonal_regional_mass_change(
         .round(3)
         .to_csv(parent_path / 'region.csv', index=True)
     )
-    # Compile glacier id | latitude | longitude | seasonal
+    # Compile glacier id | latitude | longitude | annual (boolean) | seasonal (boolean)
     glacier_series = pd.read_csv(
         glacier_series_file, usecols=['WGMS_ID', 'LATITUDE', 'LONGITUDE']
     ).set_index('WGMS_ID')
@@ -719,5 +719,6 @@ def build_seasonal_regional_mass_change(
     glaciers[['latitude', 'longitude']] = glacier_series[
         ['LATITUDE', 'LONGITUDE']
     ].loc[glacier_ids].round(6)
+    glaciers['annual'] = glaciers.index.isin(annual_glacier_ids)
     glaciers['seasonal'] = glaciers.index.isin(seasonal_glacier_ids)
     glaciers.reset_index().to_csv(parent_path / 'glacier.csv', index=False)
