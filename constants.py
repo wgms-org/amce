@@ -22,7 +22,7 @@ RGI_ATTRIBUTE_DIR: Path = INPUT_PATH / '00_rgi60/00_rgi60_attribs'
 GLACIER_ID_LUT_FILE: Path = INPUT_PATH / 'GLACIER_ID_LUT_links.csv'
 GLIMS_ATTRIBUTE_AREA_FILE: Path = INPUT_PATH / 'glims_CAU_attributes.csv'
 ZEMP_REGIONAL_SERIES_DIR: Path = INPUT_PATH / 'zemp_etal_regional_series'
-
+MASS_BALANCE_AREA_FILE: Path = INPUT_PATH / 'mass_balance_area.csv'
 
 # ---- Outputs ----
 
