@@ -178,3 +178,21 @@ amce.publish.build_doi_release(
 )
 
 amce.publish.build_website_figures()
+
+amce.publish.build_glambie_submission(
+    mass_loss_dir=MASS_LOSS_DIR,
+    lookup_anomaly_dir=LOOKUP_ANOMALY_DIR,
+    rgi_code=RGI_CODE,
+    mass_balance_area_file=MASS_BALANCE_AREA_FILE,
+    mass_balance_file=MASS_BALANCE_FILE,
+    begin_year=BEGIN_YEAR,
+    year_ini=YEAR_INI,
+    year_fin=YEAR_FIN,
+    elevation_change_file=ELEVATION_CHANGE_FILE,
+    investigators_to_drop=INVESTIGATORS_TO_DROP,
+    min_length_geo=MIN_LENGTH_GEO,
+    long_norm_anomaly_dir=LONG_NORM_ANOMALY_DIR,
+    glacier_series_file=GLACIER_SERIES_FILE,
+    rgi_area_file=RGI_AREA_FILE,
+    glambie_begin_year=1992
+)

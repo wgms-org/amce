@@ -280,14 +280,14 @@ def regional_sigma_sample(
 def regional_sigma_wrapper(
     latitude: np.ndarray,
     longitude: np.ndarray,
-    sigma_dh: np.ndarray,
-    sigma_rho: np.ndarray,
-    sigma_anom: np.ndarray,
+    sigma_dh: Optional[np.ndarray] = None,
+    sigma_rho: Optional[np.ndarray] = None,
+    sigma_anom: Optional[np.ndarray] = None,
     by_year: bool = True,
     sample_threshold: int = 30000,
     sample_size: int = 10000,
     verbose: bool = False
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
     """
     Wrapper to compute regional sigmas.
 
@@ -341,6 +341,9 @@ def regional_sigma_wrapper(
     ]
     results = []
     for name, sigma, correlation_func in variables:
+        if sigma is None:
+            results.append(None)
+            continue
         if verbose:
             print(f'[INFO] Spatial correlation for {name}')
         # TODO: Use float32 to reduce memory

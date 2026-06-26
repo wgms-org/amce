@@ -16,6 +16,7 @@ import numpy as np
 import xarray
 
 import amce.helpers
+import amce.propagation
 
 
 PUBLISH_DIR: Path = Path('publish')
@@ -762,6 +763,9 @@ def build_glambie_submission(
     elevation_change_file: Path,
     investigators_to_drop: list[str],
     min_length_geo: float,
+    long_norm_anomaly_dir: Path,
+    glacier_series_file: Path,
+    rgi_area_file: Path,
     glambie_begin_year: int = 1992
 ):
     """
@@ -963,3 +967,127 @@ def build_glambie_submission(
         .sort_values('change_id')
         .to_csv(output_dir / 'geodetic.csv', index=False)
     )
+
+    # ---- Calculate regional mass balance anomalies ----
+
+    # Build coordinate lookup table
+    df = pd.read_csv(glacier_series_file)
+    mask = (
+        (df['GLACIER_REGION_CODE'].eq('CAU') & df['GLIMS_ID'].notnull()) |
+        (df['GLACIER_REGION_CODE'].ne('CAU') & df['RGI60_ID'].notnull())
+    ) & df['WGMS_ID'].notnull()
+    df = df[mask]
+    coords = df.set_index('WGMS_ID')[['LATITUDE', 'LONGITUDE']].round(6)
+
+    # Build area lookup table
+    mask = df['GLACIER_REGION_CODE'].eq('CAU')
+    df.loc[mask, 'area_id'] = df.loc[mask, 'GLIMS_ID']
+    df.loc[~mask, 'area_id'] = df.loc[~mask, 'RGI60_ID']
+    area_ids = df.set_index('WGMS_ID')['area_id']
+    df = pd.read_csv(rgi_area_file)
+    mask = area_ids.isin(df['RGIId'])
+    area_ids = area_ids[mask]
+    areas = pd.Series(df.set_index('RGIId')['AREA'].loc[area_ids].values, index=area_ids.index)
+
+    # Load mean anomalies for each glacier
+    paths = sorted(long_norm_anomaly_dir.glob('*.csv'), key=lambda x: x.stem.lower())
+    results = []
+    for i in range(0, len(paths), 2):
+        region = paths[i].stem[:3]
+        print(region)
+        # Anomaly mean
+        mean = pd.read_csv(paths[i])
+        mask = mean['YEAR'].ge(glambie_begin_year)
+        mean = mean[mask]
+        # Anomaly sigma
+        sigma = pd.read_csv(paths[i + 1])
+        mask = sigma['YEAR'].ge(glambie_begin_year)
+        sigma = sigma[mask]
+        # Glacier ID
+        glacier_ids = mean.columns[1:].astype(int)
+        # Area (km2)
+        if region == 'CAU':
+            # Drop glaciers without area
+            mask = glacier_ids.isin(areas.index)
+            glacier_ids = glacier_ids[mask]
+            mean = mean.loc[:, ['YEAR'] + glacier_ids.astype(str).tolist()]
+            sigma = sigma.loc[:, ['YEAR'] + glacier_ids.astype(str).tolist()]
+        area = areas.loc[glacier_ids]
+        # Coordinates (latitude, longitude)
+        latlng = coords.loc[glacier_ids]
+        # Area-weighted mean by year
+        region_mean = mean.iloc[:, 1:].multiply(area.values / area.sum(), axis=1).sum(axis=1)
+        # Propagate sigmas
+        region_sigma = amce.propagation.regional_sigma_wrapper(
+            latitude=latlng['LATITUDE'].values,
+            longitude=latlng['LONGITUDE'].values,
+            sigma_anom=sigma.iloc[:, 1:].multiply(area.values / area.sum(), axis=1).values,
+            by_year=True,
+            verbose=True
+        )[-1]
+        # Compile results
+        mm_dd, offset = HYDROLOGICAL_END_DATE[region]
+        result = pd.DataFrame({
+            'region_id': int(rgi_code[region]),
+            'region_code': region,
+            'start_date': pd.to_datetime(mean['YEAR'].add(offset - 1).astype(str) + '-' + mm_dd).dt.strftime('%d/%m/%Y'),
+            'end_date': pd.to_datetime(mean['YEAR'].add(offset).astype(str) + '-' + mm_dd).dt.strftime('%d/%m/%Y'),
+            'glacier_change_observed': region_mean / 1e3,
+            'glacier_change_uncertainty': region_sigma / 1e3,
+            'unit': 'mwe',
+            'glacier_area_reference_start': None,
+            'glacier_area_reference_end': None,
+            'observational_coverage_percentage': 0,
+            'remarks': None
+        })
+        results.append(result)
+    df = pd.concat(results, ignore_index=True)
+    # Pull areas from elsewhere
+    temp_dfs = []
+    for path in mass_loss_dir.joinpath('regional_mass_loss_series').glob('*.csv'):
+        region = path.stem.split('_')[-2]
+        mm_dd, offset = HYDROLOGICAL_END_DATE[region]
+        temp = pd.read_csv(path)
+        temp = temp[temp['YEAR'].ge(glambie_begin_year)]
+        temp = pd.DataFrame({
+            'region_code': region,
+            'start_date': pd.to_datetime(temp['YEAR'].add(offset - 1).astype(str) + '-' + mm_dd).dt.strftime('%d/%m/%Y'),
+            'glacier_area_reference_start': temp['area_tot_km2'],
+            'glacier_area_reference_end': temp['area_tot_km2']
+        })
+        temp_dfs.append(temp)
+    area_df = pd.concat(temp_dfs, ignore_index=True).set_index(['region_code', 'start_date'])
+    index = pd.MultiIndex.from_frame(df[['region_code', 'start_date']])
+    df[['glacier_area_reference_start', 'glacier_area_reference_end']] = area_df.loc[index][['glacier_area_reference_start', 'glacier_area_reference_end']].values
+    # Combine SA1 and SA2 as SAN
+    mask = df['region_code'].isin(['SA1', 'SA2'])
+    san_df = df[mask].groupby('start_date', as_index=False).agg({
+        'region_id': 'first',
+        'region_code': lambda x: 'SAN',
+        'end_date': 'first',
+        'glacier_change_observed': (
+            lambda x:
+                (x * df.loc[x.index, 'glacier_area_reference_start']).sum() /
+                df.loc[x.index, 'glacier_area_reference_start'].sum()
+        ),
+        'glacier_change_uncertainty': (
+            lambda x:
+                np.sqrt((
+                    df.loc[x.index, 'glacier_change_uncertainty'] *
+                    df.loc[x.index, 'glacier_area_reference_start']
+                ) ** 2).sum() /
+                df.loc[x.index, 'glacier_area_reference_start'].sum()
+        ),
+        'unit': 'first',
+        'glacier_area_reference_start': 'sum',
+        'glacier_area_reference_end': 'sum',
+        'observational_coverage_percentage': (
+            lambda x:
+                (x * df.loc[x.index, 'glacier_area_reference_start']).sum() /
+                df.loc[x.index, 'glacier_area_reference_start'].sum()
+        ),
+        'remarks': 'first'
+    })
+    df = pd.concat((df[~mask], san_df), ignore_index=True).sort_values(['region_id', 'start_date'])
+    # Write to file
+    df.drop(columns='region_code').to_csv(output_dir / 'submission-glaciological.csv', index=False)
