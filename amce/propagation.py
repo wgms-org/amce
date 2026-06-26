@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 import pyproj.aoi
@@ -363,14 +363,18 @@ def regional_sigma_wrapper(
             result = result * sigma.shape[0]
         elif by_year:
             result = []
+            result_map = {}
             for i, row in enumerate(sigma, start=1):
                 if verbose:
                     print(f'year (of {sigma.shape[0]}): {i}', end='\r')
-                result += regional_func(
-                    sigma=row,
-                    correlation=correlation,
-                    **kwargs
-                ).tolist()
+                key = tuple(row)
+                if key not in result_map:
+                    result_map[key] = regional_func(
+                        sigma=row,
+                        correlation=correlation,
+                        **kwargs
+                    ).tolist()
+                result += result_map[key]
             if verbose:
                 print('')
         else:
