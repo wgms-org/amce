@@ -766,7 +766,7 @@ def build_glambie_submission(
     long_norm_anomaly_dir: Path,
     glacier_series_file: Path,
     rgi_area_file: Path,
-    glambie_begin_year: int = 1992
+    glambie_begin_year: int = 1976
 ):
     """
     Build GlaMBIE regional mass change submission.
@@ -869,6 +869,10 @@ def build_glambie_submission(
         data=[
             (5, 'GRL', 16),
             (5, 'GRL', 39),
+            (6, 'ISL', 302),
+            (6, 'ISL', 317),
+            (6, 'ISL', 2296),
+            (16, 'TRP', 1344),
             (18, 'NZL', 1344),
             (19, 'ANT', 1344)
         ]

@@ -194,5 +194,5 @@ amce.publish.build_glambie_submission(
     long_norm_anomaly_dir=LONG_NORM_ANOMALY_DIR,
     glacier_series_file=GLACIER_SERIES_FILE,
     rgi_area_file=RGI_AREA_FILE,
-    glambie_begin_year=1992
+    glambie_begin_year=1976
 )
