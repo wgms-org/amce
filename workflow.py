@@ -184,6 +184,7 @@ amce.publish.build_glambie_submission(
     lookup_anomaly_dir=LOOKUP_ANOMALY_DIR,
     rgi_code=RGI_CODE,
     mass_balance_area_file=MASS_BALANCE_AREA_FILE,
+    regional_area_change_rate_file=REGIONAL_AREA_CHANGE_RATE_FILE,
     mass_balance_file=MASS_BALANCE_FILE,
     begin_year=BEGIN_YEAR,
     year_ini=YEAR_INI,
