@@ -756,6 +756,7 @@ def build_glambie_submission(
     lookup_anomaly_dir: Path,
     rgi_code: dict[str, str],
     mass_balance_area_file: Path,
+    regional_area_change_rate_file: Path,
     mass_balance_file: Path,
     begin_year: int,
     year_ini: int,
@@ -845,59 +846,85 @@ def build_glambie_submission(
         'remarks': 'first'
     })
     df = pd.concat((df, san_df), ignore_index=True).sort_values(['region_id', 'start_date'])
-    df.to_csv(output_dir / 'submission.csv', index=False)
+    for column in ['glacier_change_observed', 'glacier_change_uncertainty']:
+        df[column] = df[column].round(3)
+    for colum in ['glacier_area_reference_start', 'glacier_area_reference_end', 'observational_coverage_percentage']:
+        df[colum] = df[colum].round(0).astype('Int64')
+    df.to_csv(output_dir / 'submission-combined.csv', index=False)
 
     # ---- Table of mass balance glacier ids by region and their total area ----
 
-    # Load glacier ids by region
-    glacier_ids = {}
+    # Load glacier ids by region and year
+    dfs = []
     for path in lookup_anomaly_dir.glob('*_all_reg_gla_anomalies.csv'):
-        df = pd.read_csv(path)
         region = path.stem.split('_')[0]
-        glacier_ids[region] = sorted(df.columns[1:].astype(int))
-    df = pd.DataFrame({
-        'region_id': [int(rgi_code[region]) for region in glacier_ids.keys()],
-        'region_code': glacier_ids.keys(),
-        'glacier_id': glacier_ids.values()
-    })
-    df = df.explode('glacier_id')
+        series = pd.read_csv(path).set_index('YEAR')
+        for glacier_id in series.columns:
+            mask = series[glacier_id].notnull()
+            df = pd.DataFrame({
+                'region_code': region,
+                'year': series.index[mask],
+                'glacier_id': int(glacier_id),
+            })
+            dfs.append(df)
+    df = pd.concat(dfs, ignore_index=True)
 
     # Add normalized glaciers
     # TODO: Update if start year is changed in the future
     temp = pd.DataFrame(
-        columns=['region_id', 'region_code', 'glacier_id'],
+        columns=['region_code', 'glacier_id'],
         data=[
-            (5, 'GRL', 16),
-            (5, 'GRL', 39),
-            (6, 'ISL', 302),
-            (6, 'ISL', 317),
-            (6, 'ISL', 2296),
-            (16, 'TRP', 1344),
-            (18, 'NZL', 1344),
-            (19, 'ANT', 1344)
+            ('GRL', 16),
+            ('GRL', 39),
+            ('ISL', 302),
+            ('ISL', 317),
+            ('ISL', 2296),
+            ('TRP', 1344),
+            ('NZL', 1344),
+            ('ANT', 1344)
         ]
     )
-    df = pd.concat((df, temp), ignore_index=True)
+    df = pd.concat((df, temp), ignore_index=True).convert_dtypes()
 
-    # Add glacier area
-    area_df = pd.read_csv(mass_balance_area_file)
-    df = df.merge(area_df, left_on='glacier_id', right_on='glacier_id', how='left')
-    assert df['area_m2'].notnull().all()
+    # Add region id
+    df['region_id'] = df['region_code'].map(rgi_code).astype('Int64')
 
     # Merge SA1 and SA2 as SAN
+    region_glacier_ids_sa12 = df.copy()
     is_san = df['region_code'].isin(['SA1', 'SA2'])
     df.loc[is_san, 'region_code'] = 'SAN'
 
-    # Save for later
-    glacier_ids = df
+    # Mark which glaciers are local to the region
+    df['local'] = (
+        pd.read_csv(mass_balance_file)[['GLACIER_REGION_CODE', 'WGMS_ID']]
+        .drop_duplicates()
+        .set_index('WGMS_ID')['GLACIER_REGION_CODE']
+    ).loc[df['glacier_id']].eq(df['region_code'].values).values
 
-    # Aggregate by region
-    df = df.groupby('region_code', as_index=False).agg(
+    # Save for later
+    region_glacier_ids = df.copy()
+
+    # Tabulate region id, region code, glacier ids
+    table = df.groupby('region_code', as_index=False).agg(
         region_id=pd.NamedAgg(column='region_id', aggfunc='first'),
-        glacier_ids=pd.NamedAgg(column='glacier_id', aggfunc=lambda x: '|'.join(x.sort_values().astype(str))),
-        area_km2=pd.NamedAgg(column='area_m2', aggfunc=lambda x: x.sum() / 1e6)
-    )[['region_id', 'region_code', 'glacier_ids', 'area_km2']].sort_values('region_id')
-    df.to_csv(output_dir / 'glaciers.csv', index=False)
+        glacier_ids=pd.NamedAgg(column='glacier_id', aggfunc=lambda x: '|'.join(x.drop_duplicates().sort_values().astype(str)))
+    ).sort_values('region_id')
+
+    # Add glacier area
+    areas = pd.read_csv(mass_balance_area_file).set_index('glacier_id')[['area_m2']]
+    temp = df[df['local']][['region_id', 'glacier_id']].drop_duplicates().copy()
+    temp['area_m2'] = areas.loc[temp['glacier_id'], 'area_m2'].values
+    table['area_local_km2'] = (
+        temp.groupby('region_id')['area_m2']
+        .sum()
+        .div(1e6)
+        .round(0)
+        .astype('Int64')
+        .reindex(table['region_id'])
+        .fillna(0)
+        .values
+    )
+    table[['region_id', 'region_code', 'glacier_ids', 'area_local_km2']].to_csv(output_dir / 'glaciers.csv', index=False)
 
     # ---- Table of extra or excluded mass balance glacier ids by region ----
     # See manual table with descriptions in glaciers-special.csv
@@ -919,7 +946,7 @@ def build_glambie_submission(
 
     # Compare to glacier_ids above
     results = []
-    a = glacier_ids.set_index('region_code')
+    a = region_glacier_ids.set_index('region_code')
     b = df.set_index('region_code')
     for region in a.sort_values('region_id').index.unique():
         ai = set(a.loc[[region], 'glacier_id'])
@@ -936,23 +963,13 @@ def build_glambie_submission(
 
     # ---- Look up tables for reference and author lists ----
 
-    # glaciological
-    glacier_ids[['glacier_id']].drop_duplicates()
-    df = pd.read_csv(mass_balance_file)
-    mask = df['YEAR'].ge(glambie_begin_year) & df['ANNUAL_BALANCE'].notnull() & df['WGMS_ID'].isin(glacier_ids['glacier_id'])
-    (
-        df[mask][['WGMS_ID', 'YEAR']]
-        .rename(columns={'WGMS_ID': 'glacier_id', 'YEAR': 'year'})
-        .sort_values(['glacier_id', 'year'])
-        .to_csv(output_dir / 'glaciological.csv', index=False)
-    )
-
     # geodetic
     df = pd.read_csv(elevation_change_file)
     mask = (
         df['ELEVATION_CHANGE'].notnull() &
         df['SURVEY_DATE'].notnull() &
         df['REFERENCE_DATE'].notnull() &
+        df['GLACIER_REGION_CODE'].notnull() &
         (
             (df['GLACIER_REGION_CODE'].eq('CAU') & df['GLIMS_ID'].notnull()) |
             (df['GLACIER_REGION_CODE'].ne('CAU') & df['RGI60_ID'].notnull())
@@ -960,16 +977,77 @@ def build_glambie_submission(
         ~df['INVESTIGATOR'].isin(investigators_to_drop)
     )
     df = df[mask]
-    dt = (
-        amce.helpers.wgms_date_to_decimal_year(df['SURVEY_DATE']) -
-        amce.helpers.wgms_date_to_decimal_year(df['REFERENCE_DATE'])
+    begin_date = amce.helpers.wgms_date_to_decimal_year(df['REFERENCE_DATE'])
+    end_date = amce.helpers.wgms_date_to_decimal_year(df['SURVEY_DATE'])
+    # Gather regional glaciological periods
+    region_periods = {}
+    for path in mass_loss_dir.joinpath('regional_mass_loss_series').glob('*.csv'):
+        region = path.stem.split('_')[-2]
+        temp = pd.read_csv(path).set_index('YEAR')
+        min_year = temp['Aw_mwe'].first_valid_index()
+        max_year = temp['Aw_mwe'].last_valid_index()
+        min_year = min(max(min_year, 1915), 2000)
+        region_periods[region] = (min_year, max_year)
+    # Include if within glaciological period
+    region_id = df['GLACIER_REGION_CODE'].where(
+        df['GLACIER_REGION_CODE'].ne('SAN'), df['GLACIER_SUBREGION_CODE'].map({'SAN-01': 'SA1', 'SAN-02': 'SA2'})
     )
-    df = df[dt.gt(min_length_geo)]
+    min_year = region_id.map(lambda x: region_periods[x][0])
+    max_year = region_id.map(lambda x: region_periods[x][1])
+    mask = (
+        (end_date - begin_date).gt(min_length_geo) &
+        (begin_date >= min_year - 2) &
+        (end_date <= max_year + 1)
+    )
     (
-        df[['SURVEY_ID']]
+        df[mask][['SURVEY_ID']]
         .rename(columns={'SURVEY_ID': 'change_id'})
         .sort_values('change_id')
         .to_csv(output_dir / 'geodetic.csv', index=False)
+    )
+
+    # Add glaciological from before min_year that overlap geodetic
+    mask &= begin_date.lt(glambie_begin_year)
+    df = df[mask]
+    begin_date = begin_date[mask]
+    end_date = end_date[mask]
+    region_id = region_id[mask]
+    years = [list(range(int(begin), int(end))) for begin, end in zip(begin_date, end_date)]
+    region_earlier_calibrated_years = pd.DataFrame({
+        'region_id': region_id,
+        'year': years
+    }).explode('year').drop_duplicates()
+
+    # glaciological
+    df = pd.read_csv(mass_balance_file)
+    region_id = df['GLACIER_REGION_CODE'].where(
+        df['GLACIER_REGION_CODE'].ne('SAN'),
+        df['GLACIER_SUBREGION_CODE'].map({'SAN-01': 'SA1', 'SAN-02': 'SA2'})
+    )
+    region_year = pd.MultiIndex.from_arrays([region_id, df['YEAR']])
+    glacier_year = pd.MultiIndex.from_arrays([df['WGMS_ID'], df['YEAR']])
+    mask = (
+        (
+            df['YEAR'].ge(glambie_begin_year) |
+            region_year.isin(pd.MultiIndex.from_frame(region_earlier_calibrated_years)) |
+            glacier_year.isin(pd.MultiIndex.from_frame(
+                region_glacier_ids_sa12.drop(columns='year').drop_duplicates().merge(
+                    region_earlier_calibrated_years,
+                    left_on='region_code',
+                    right_on='region_id',
+                    how='inner'
+                )[['glacier_id', 'year']].drop_duplicates()
+            ))
+        ) &
+        df['ANNUAL_BALANCE'].notnull() &
+        df['WGMS_ID'].isin(region_glacier_ids['glacier_id']) &
+        region_id.notnull()
+    )
+    (
+        df[mask][['WGMS_ID', 'YEAR']]
+        .rename(columns={'WGMS_ID': 'glacier_id', 'YEAR': 'year'})
+        .sort_values(['glacier_id', 'year'])
+        .to_csv(output_dir / 'glaciological.csv', index=False)
     )
 
     # ---- Calculate regional mass balance anomalies ----
@@ -1093,5 +1171,27 @@ def build_glambie_submission(
         'remarks': 'first'
     })
     df = pd.concat((df[~mask], san_df), ignore_index=True).sort_values(['region_id', 'start_date'])
+
+    # Calculate observational coverage percentage
+    regional_areas = (
+        pd.read_csv(regional_area_change_rate_file)
+        .set_index('region_id')['reference_area_km2']
+    )
+    mask = region_glacier_ids['local'] & region_glacier_ids['year'].notnull()
+    glacier_ids = region_glacier_ids[mask].copy()
+    # Add glacier areas
+    areas = pd.read_csv(mass_balance_area_file).set_index('glacier_id')['area_m2']
+    glacier_ids['area_m2'] = areas.loc[glacier_ids['glacier_id']].values
+    observed_areas = glacier_ids.groupby(['region_id', 'year'])['area_m2'].sum().div(1e6)
+    df['observational_coverage_percentage'] = observed_areas.reindex(pd.MultiIndex.from_frame(
+        df.assign(year=df['end_date'].str.slice(6, 10).astype(int))[['region_id', 'year']]
+    )).fillna(0).div(regional_areas.loc[df['region_code']].values).mul(100).round(2).values
+
+    # Round values
+    for column in ['glacier_change_observed', 'glacier_change_uncertainty']:
+        df[column] = df[column].round(3)
+    for colum in ['glacier_area_reference_start', 'glacier_area_reference_end']:
+        df[colum] = df[colum].round(0).astype('Int64')
+
     # Write to file
     df.drop(columns='region_code').to_csv(output_dir / 'submission-glaciological.csv', index=False)
